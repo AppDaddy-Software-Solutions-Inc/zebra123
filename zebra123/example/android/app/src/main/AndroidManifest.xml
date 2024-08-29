@@ -3,7 +3,7 @@
     xmlns:tools="http://schemas.android.com/tools"
     >
     <application
-        android:label="zebra123_example"
+        android:label="zebra123"
         tools:replace="android:label"
         android:name="${applicationName}"
         android:icon="@mipmap/ic_launcher">

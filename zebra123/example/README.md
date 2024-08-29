@@ -1,4 +1,4 @@
-# zebra123_example
+# zebra123
 
 Demonstrates how to use the zebra123 plugin.
 
