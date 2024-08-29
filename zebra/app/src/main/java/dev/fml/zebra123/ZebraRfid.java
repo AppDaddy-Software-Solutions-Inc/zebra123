@@ -35,9 +35,10 @@ import java.util.HashMap;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
-public class ZebraSdk implements Readers.RFIDReaderEventHandler {
+public class ZebraRfid implements Readers.RFIDReaderEventHandler, ZebraDevice {
 
-    private String TAG = "zebra123";
+    private static String TAG = "zebra123";
+
     Context context;
 
     private static Readers readers;
@@ -47,11 +48,24 @@ public class ZebraSdk implements Readers.RFIDReaderEventHandler {
 
     private HashMap<String, TagInfo> tags = new HashMap<>();
 
-    ZebraListener listener;
+    ZebraDeviceListener listener;
 
-    ZebraSdk(Context context, ZebraListener listener) {
+    ZebraRfid(Context context, ZebraDeviceListener listener) {
         this.context = context;
         this.listener = listener;
+    }
+
+    public static boolean isSupported(Context context) {
+
+        try {
+            Readers readers = new Readers(context, ENUM_TRANSPORT.ALL);
+            ArrayList<ReaderDevice> readersListArray = readers.GetAvailableRFIDReaderList();
+            if (readersListArray.size() > 0) return true;
+        }
+        catch(Exception e) {
+            Log.d(TAG, "Reader does not support RFID");
+        }
+        return false;
     }
 
     public void setPowerLevel(int level) {
@@ -69,13 +83,13 @@ public class ZebraSdk implements Readers.RFIDReaderEventHandler {
         }
     }
 
-    public void setReadMode(String mode) {
+    public void setMode(String mode) {
         if (reader != null) {
             try {
                 ENUM_TRIGGER_MODE _mode = ENUM_TRIGGER_MODE.RFID_MODE;
                 if (mode.toLowerCase().trim().equals("barcode")) _mode = ENUM_TRIGGER_MODE.BARCODE_MODE;
                 if (mode.toLowerCase().trim().equals("rfid")) _mode = ENUM_TRIGGER_MODE.RFID_MODE;
-                setReadMode(_mode);
+                setMode(_mode);
             }
             catch (Exception e) {
                 Log.e(TAG,e.getMessage());
@@ -83,7 +97,7 @@ public class ZebraSdk implements Readers.RFIDReaderEventHandler {
         }
     }
 
-    private void setReadMode(ENUM_TRIGGER_MODE mode) {
+    private void setMode(ENUM_TRIGGER_MODE mode) {
         if (reader != null) {
             try {
                 reader.Config.setTriggerMode(mode, true);
@@ -167,7 +181,11 @@ public class ZebraSdk implements Readers.RFIDReaderEventHandler {
                 ConnectionStatus status=ConnectionStatus.connected;
                 HashMap<String, Object> map = new HashMap<>();
                 map.put("status", status.ordinal());
-                if (listener != null) listener.onZebraListenerSuccess(ZebraEvents.ConnectionStatus,map);
+
+                // notify device
+                if (listener != null) {
+                    listener.notify(ZebraEvents.ConnectionStatus,map);
+                }
             }
 
             @Override
@@ -177,7 +195,7 @@ public class ZebraSdk implements Readers.RFIDReaderEventHandler {
         }.execute();
     }
 
-    public void dispose() {
+    public void disconnect() {
         try {
             if (readers != null) {
                 readerDevice=null;
@@ -186,7 +204,11 @@ public class ZebraSdk implements Readers.RFIDReaderEventHandler {
                 readers = null;
                 HashMap<String, Object> map =new HashMap<>();
                 map.put("status", ConnectionStatus.disconnected.ordinal());
-                if (listener != null) listener.onZebraListenerSuccess(ZebraEvents.ConnectionStatus,map);
+
+                // notify device
+                if (listener != null) {
+                    listener.notify(ZebraEvents.ConnectionStatus,map);
+                }
             }
         } catch (Exception e) {
             e.printStackTrace();
@@ -215,7 +237,7 @@ public class ZebraSdk implements Readers.RFIDReaderEventHandler {
                 reader.Events.setAttachTagDataWithReadEvent(false);
 
                 // set read mode
-                setReadMode(ENUM_TRIGGER_MODE.BARCODE_MODE);
+                setMode(ENUM_TRIGGER_MODE.BARCODE_MODE);
 
                 // set start and stop triggers
                 setTriggers(START_TRIGGER_TYPE.START_TRIGGER_TYPE_IMMEDIATE, STOP_TRIGGER_TYPE.STOP_TRIGGER_TYPE_IMMEDIATE);
@@ -254,7 +276,11 @@ public class ZebraSdk implements Readers.RFIDReaderEventHandler {
             if (listener != null) {
                 ErrorResult error = ErrorResult.error(e.getMessage());
                 HashMap<String, Object> map = transitionEntity(error);
-                listener.onZebraListenerError(ZebraEvents.Error, map);
+
+                // notify device
+                if (listener != null) {
+                    listener.notify(ZebraEvents.Error,e);
+                }
             }
         }
 
@@ -384,7 +410,9 @@ public class ZebraSdk implements Readers.RFIDReaderEventHandler {
                 hashMap.put("tags",data);
 
                 // notify listener
-                if (listener != null) listener.onZebraListenerSuccess(ZebraEvents.ReadRfid,hashMap);
+                if (listener != null) {
+                    listener.notify(ZebraEvents.ReadRfid,hashMap);
+                }
             }
         }
         catch (InvalidUsageException e) {
@@ -408,7 +436,7 @@ public class ZebraSdk implements Readers.RFIDReaderEventHandler {
         Log.d(TAG, "RFIDReaderDisappeared " + readerDevice.getName());
 //        if (readerDevice.getName().equals(reader.getHostName()))
 //            disconnect();
-        dispose();
+        disconnect();
     }
 
     //Entity class transfer HashMap

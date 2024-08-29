@@ -26,9 +26,9 @@ class Zebra123 {
     required this.errorCallback,
   });
 
-  Future connect() async {
+  Future connect({String? method}) async {
     sink ??= eventChannel.receiveBroadcastStream().listen(_eventListener);
-    methodChannel.invokeMethod("connect");
+    methodChannel.invokeMethod("connect", {"method": method});
   }
 
   Future setMode(String mode) async {

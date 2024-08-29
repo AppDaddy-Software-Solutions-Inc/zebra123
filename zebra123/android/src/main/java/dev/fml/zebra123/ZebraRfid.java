@@ -5,17 +5,40 @@ import android.os.Handler;
 import android.os.Looper;
 import android.util.Log;
 
+import com.zebra.rfid.api3.ACCESS_OPERATION_CODE;
+import com.zebra.rfid.api3.ACCESS_OPERATION_STATUS;
+import com.zebra.rfid.api3.Antennas;
+import com.zebra.rfid.api3.BATCH_MODE;
+import com.zebra.rfid.api3.ENUM_TRANSPORT;
+import com.zebra.rfid.api3.ENUM_TRIGGER_MODE;
+import com.zebra.rfid.api3.HANDHELD_TRIGGER_EVENT_TYPE;
+import com.zebra.rfid.api3.INVENTORY_STATE;
+import com.zebra.rfid.api3.InvalidUsageException;
+import com.zebra.rfid.api3.OperationFailureException;
+import com.zebra.rfid.api3.RFIDReader;
+import com.zebra.rfid.api3.ReaderDevice;
+import com.zebra.rfid.api3.Readers;
+import com.zebra.rfid.api3.RfidEventsListener;
+import com.zebra.rfid.api3.RfidReadEvents;
+import com.zebra.rfid.api3.RfidStatusEvents;
+import com.zebra.rfid.api3.SESSION;
+import com.zebra.rfid.api3.SL_FLAG;
+import com.zebra.rfid.api3.START_TRIGGER_TYPE;
+import com.zebra.rfid.api3.STATUS_EVENT_TYPE;
+import com.zebra.rfid.api3.STOP_TRIGGER_TYPE;
+import com.zebra.rfid.api3.TagData;
+import com.zebra.rfid.api3.TriggerInfo;
+
 import java.lang.reflect.Field;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
-import com.zebra.rfid.api3.*;
+public class ZebraRfid implements Readers.RFIDReaderEventHandler, ZebraDevice {
 
-public class Zebra implements Readers.RFIDReaderEventHandler {
+    private static String TAG = "zebra123";
 
-    private String TAG = "zebra123";
     Context context;
 
     private static Readers readers;
@@ -24,11 +47,25 @@ public class Zebra implements Readers.RFIDReaderEventHandler {
     private IEventHandler eventHandler = new IEventHandler();
 
     private HashMap<String, TagInfo> tags = new HashMap<>();
-    private ZebraListener callback;
 
-    Zebra(Context _context, ZebraListener callback) {
-        context = _context;
-        this.callback = callback;
+    ZebraDeviceListener listener;
+
+    ZebraRfid(Context context, ZebraDeviceListener listener) {
+        this.context = context;
+        this.listener = listener;
+    }
+
+    public static boolean isSupported(Context context) {
+
+        try {
+            Readers readers = new Readers(context, ENUM_TRANSPORT.ALL);
+            ArrayList<ReaderDevice> readersListArray = readers.GetAvailableRFIDReaderList();
+            if (readersListArray.size() > 0) return true;
+        }
+        catch(Exception e) {
+            Log.d(TAG, "Reader does not support RFID");
+        }
+        return false;
     }
 
     public void setPowerLevel(int level) {
@@ -46,13 +83,13 @@ public class Zebra implements Readers.RFIDReaderEventHandler {
         }
     }
 
-    public void setReadMode(String mode) {
+    public void setMode(String mode) {
         if (reader != null) {
             try {
                 ENUM_TRIGGER_MODE _mode = ENUM_TRIGGER_MODE.RFID_MODE;
                 if (mode.toLowerCase().trim().equals("barcode")) _mode = ENUM_TRIGGER_MODE.BARCODE_MODE;
                 if (mode.toLowerCase().trim().equals("rfid")) _mode = ENUM_TRIGGER_MODE.RFID_MODE;
-                setReadMode(_mode);
+                setMode(_mode);
             }
             catch (Exception e) {
                 Log.e(TAG,e.getMessage());
@@ -60,7 +97,7 @@ public class Zebra implements Readers.RFIDReaderEventHandler {
         }
     }
 
-    private void setReadMode(ENUM_TRIGGER_MODE mode) {
+    private void setMode(ENUM_TRIGGER_MODE mode) {
         if (reader != null) {
             try {
                 reader.Config.setTriggerMode(mode, true);
@@ -144,7 +181,11 @@ public class Zebra implements Readers.RFIDReaderEventHandler {
                 ConnectionStatus status=ConnectionStatus.connected;
                 HashMap<String, Object> map = new HashMap<>();
                 map.put("status", status.ordinal());
-                broadcast(ZebraEvents.ConnectionStatus,map);
+
+                // notify device
+                if (listener != null) {
+                    listener.notify(ZebraEvents.ConnectionStatus,map);
+                }
             }
 
             @Override
@@ -154,7 +195,7 @@ public class Zebra implements Readers.RFIDReaderEventHandler {
         }.execute();
     }
 
-    public void dispose() {
+    public void disconnect() {
         try {
             if (readers != null) {
                 readerDevice=null;
@@ -163,7 +204,11 @@ public class Zebra implements Readers.RFIDReaderEventHandler {
                 readers = null;
                 HashMap<String, Object> map =new HashMap<>();
                 map.put("status", ConnectionStatus.disconnected.ordinal());
-                broadcast(ZebraEvents.ConnectionStatus,map);
+
+                // notify device
+                if (listener != null) {
+                    listener.notify(ZebraEvents.ConnectionStatus,map);
+                }
             }
         } catch (Exception e) {
             e.printStackTrace();
@@ -192,7 +237,7 @@ public class Zebra implements Readers.RFIDReaderEventHandler {
                 reader.Events.setAttachTagDataWithReadEvent(false);
 
                 // set read mode
-                setReadMode(ENUM_TRIGGER_MODE.BARCODE_MODE);
+                setMode(ENUM_TRIGGER_MODE.BARCODE_MODE);
 
                 // set start and stop triggers
                 setTriggers(START_TRIGGER_TYPE.START_TRIGGER_TYPE_IMMEDIATE, STOP_TRIGGER_TYPE.STOP_TRIGGER_TYPE_IMMEDIATE);
@@ -215,15 +260,30 @@ public class Zebra implements Readers.RFIDReaderEventHandler {
 
     ///Get reader information
     public   ArrayList<ReaderDevice> getReadersList() {
+
         ArrayList<ReaderDevice> readersListArray=new  ArrayList<ReaderDevice>();
-        try {
+
+        try
+        {
             if(readers!=null) {
                 readersListArray = readers.GetAvailableRFIDReaderList();
                 return readersListArray;
             }
-        }catch (InvalidUsageException e){
-            broadcast(ZebraEvents.Error, transitionEntity(ErrorResult.error(e.getMessage())));
         }
+        catch (Exception e)
+        {
+            // notify listener
+            if (listener != null) {
+                ErrorResult error = ErrorResult.error(e.getMessage());
+                HashMap<String, Object> map = transitionEntity(error);
+
+                // notify device
+                if (listener != null) {
+                    listener.notify(ZebraEvents.Error,e);
+                }
+            }
+        }
+
         return  readersListArray;
     }
 
@@ -348,7 +408,11 @@ public class Zebra implements Readers.RFIDReaderEventHandler {
 
                 HashMap<String,Object> hashMap=new HashMap<>();
                 hashMap.put("tags",data);
-                broadcast(ZebraEvents.ReadRfid,hashMap);
+
+                // notify listener
+                if (listener != null) {
+                    listener.notify(ZebraEvents.ReadRfid,hashMap);
+                }
             }
         }
         catch (InvalidUsageException e) {
@@ -372,7 +436,7 @@ public class Zebra implements Readers.RFIDReaderEventHandler {
         Log.d(TAG, "RFIDReaderDisappeared " + readerDevice.getName());
 //        if (readerDevice.getName().equals(reader.getHostName()))
 //            disconnect();
-        dispose();
+        disconnect();
     }
 
     //Entity class transfer HashMap
@@ -389,10 +453,6 @@ public class Zebra implements Readers.RFIDReaderEventHandler {
             }
         }
         return hashMap;
-    }
-
-    public void broadcast(final String eventName, final HashMap map) {
-        map.put("eventName", eventName);
     }
 
     public  static  class ZebraEvents {

@@ -19,7 +19,7 @@ import io.flutter.plugin.common.MethodChannel.MethodCallHandler;
 import io.flutter.plugin.common.MethodChannel.Result;
 
 /** Zebra123 */
-public class Zebra123 implements FlutterPlugin, MethodCallHandler, StreamHandler, ZebraListener {
+public class Zebra123 implements FlutterPlugin, MethodCallHandler, StreamHandler, ZebraDeviceListener {
   /// The MethodChannel that will the communication between Flutter and native Android
   ///
   /// This local reference serves to register the plugin with the Flutter Engine and unregister it
@@ -31,8 +31,7 @@ public class Zebra123 implements FlutterPlugin, MethodCallHandler, StreamHandler
 
   private EventChannel.EventSink sink = null;
 
-  private ZebraDataWedge oZebraDataWedge;
-  private ZebraSdk oZebraSdk;
+  private ZebraDevice device;
 
   private Context oContext;
 
@@ -45,8 +44,13 @@ public class Zebra123 implements FlutterPlugin, MethodCallHandler, StreamHandler
 
     oContext = flutterPluginBinding.getApplicationContext();
 
-    oZebraSdk = new ZebraSdk(oContext, this);
-    //oZebraDataWedge = new ZebraDataWedge(oContext, this);
+    // device supports rfid?
+    boolean isRfid = ZebraRfid.isSupported(oContext);
+    if (isRfid) {
+      device = new ZebraRfid(oContext, this);
+    } else {
+      device = new ZebraDataWedge(oContext, this);
+    }
 
     oMethodHandler = new MethodChannel(flutterPluginBinding.getBinaryMessenger(), METHODCHANNEL);
     oMethodHandler.setMethodCallHandler(this);
@@ -58,39 +62,39 @@ public class Zebra123 implements FlutterPlugin, MethodCallHandler, StreamHandler
   @Override
   public void onMethodCall(@NonNull MethodCall call, @NonNull Result result) {
 
-    switch (call.method) {
+    String method = call.method;
+
+    switch (method) {
 
       case "getPlatformVersion":
         result.success("Android " + android.os.Build.VERSION.RELEASE);
         break;
 
       case "toast":
-        String txt=call.argument("text");
-        Toast.makeText(oContext, txt, Toast.LENGTH_LONG).show();
+        Toast.makeText(oContext, call.argument("text"), Toast.LENGTH_LONG).show();
         break;
 
       case "connect":
         // boolean  isBluetooth=call.argument("isBluetooth");
-        oZebraSdk.connect();
+        String _method = call.argument("method");
+        device.connect();
         break;
 
+      // set device mode
       case "mode":
         String mode = call.argument("mode");
-        oZebraSdk.setReadMode(mode);
+        device.setMode(mode);
         break;
 
+      // disconnect from the device
       case "disconnect":
-        oZebraSdk.dispose();
+        device.disconnect();
         result.success(null);
         break;
 
-      case "getReadersList":
-        oZebraSdk.getReadersList();
-//        break;
-      case "write":
-        break;
+      // not implemented
       default:
-        result.notImplemented();
+        Toast.makeText(oContext, "Method not implemented: " + method, Toast.LENGTH_LONG).show();
     }
   }
 
@@ -114,7 +118,7 @@ public class Zebra123 implements FlutterPlugin, MethodCallHandler, StreamHandler
   }
 
   @Override
-  public void onZebraListenerSuccess(final String event, final HashMap map) {
+  public void notify(final String event, final HashMap map) {
 
     map.put("eventName", event);
     oHandler.post(() -> {
@@ -129,7 +133,7 @@ public class Zebra123 implements FlutterPlugin, MethodCallHandler, StreamHandler
   }
 
   @Override
-  public void onZebraListenerError(final String event, final HashMap map) {
+  public void notify(final String event, final Exception exception) {
 
   }
 }

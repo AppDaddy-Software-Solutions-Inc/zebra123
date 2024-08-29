@@ -12,10 +12,10 @@ import org.json.JSONObject;
 
 import java.util.ArrayList;
 
-public final class ZebraDataWedge extends BroadcastReceiver {
+public final class ZebraDataWedge extends BroadcastReceiver implements ZebraDevice {
 
     private Context context;
-    ZebraListener listener;
+    ZebraDeviceListener listener;
 
     public static final String PROFILE = "dev.fml.zebra123";
 
@@ -32,7 +32,7 @@ public final class ZebraDataWedge extends BroadcastReceiver {
     public static final String DATAWEDGE_SEND_SET_CONFIG = "com.symbol.datawedge.api.SET_CONFIG";
     public static final String DATAWEDGE_SEND_SCANNER_COMMAND = "com.symbol.datawedge.api.SCANNER_INPUT_PLUGIN";
 
-    public ZebraDataWedge(Context context, ZebraListener listener) {
+    public ZebraDataWedge(Context context, ZebraDeviceListener listener) {
 
         this.context = context;
         this.listener = listener;
@@ -70,7 +70,7 @@ public final class ZebraDataWedge extends BroadcastReceiver {
     }
 
 
-    public void sendCommandString(@NotNull String command, @NotNull String parameter, boolean sendResult) {
+    private void sendCommandString(@NotNull String command, @NotNull String parameter, boolean sendResult) {
         Intent dwIntent = new Intent();
         dwIntent.setAction("com.symbol.datawedge.api.ACTION");
         dwIntent.putExtra(command, parameter);
@@ -80,14 +80,29 @@ public final class ZebraDataWedge extends BroadcastReceiver {
         this.context.sendBroadcast(dwIntent);
     }
 
-    public void sendCommandBundle(@NotNull String command, @NotNull Bundle parameter) {
+    private void sendCommandBundle(@NotNull String command, @NotNull Bundle parameter) {
         Intent dwIntent = new Intent();
         dwIntent.setAction("com.symbol.datawedge.api.ACTION");
         dwIntent.putExtra(command, parameter);
         this.context.sendBroadcast(dwIntent);
     }
 
-    public void createProfile() {
+    @Override
+    public void connect() {
+
+    }
+
+    @Override
+    public void disconnect() {
+
+    }
+
+    @Override
+    public void setMode(String mode) {
+
+    }
+
+    private void createProfile() {
 
         // create the profile if it doesnt exist
         sendCommandString("com.symbol.datawedge.api.CREATE_PROFILE", PROFILE, false);
