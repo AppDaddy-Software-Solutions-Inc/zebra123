@@ -6,18 +6,25 @@ import android.content.Intent;
 import android.content.IntentFilter;
 import android.os.Bundle;
 import android.os.Parcelable;
+import android.util.Log;
 
 import org.jetbrains.annotations.NotNull;
-import org.json.JSONObject;
 
+import java.text.SimpleDateFormat;
 import java.util.ArrayList;
+import java.util.Calendar;
+import java.util.Date;
+import java.util.HashMap;
 
 public final class ZebraDataWedge extends BroadcastReceiver implements ZebraDevice {
 
+    private static final ZebraInterfaces INTERFACE = ZebraInterfaces.dataWedge;
+
+    private static String TAG = "zebra123";
+    private static final String PROFILE = "dev.fml.zebra123";
+
     private Context context;
     ZebraDeviceListener listener;
-
-    public static final String PROFILE = "dev.fml.zebra123";
 
     public static final String PROFILE_INTENT_ACTION = PROFILE;
     public static final String PROFILE_INTENT_BROADCAST = "2";
@@ -50,22 +57,28 @@ public final class ZebraDataWedge extends BroadcastReceiver implements ZebraDevi
         String action = intent.getAction();
         if (action.equals(PROFILE)) {
 
-            //Get data from Intent
-            String decodedSource = intent.getStringExtra("com.symbol.datawedge.source");
-            String decodedData = intent.getStringExtra("com.symbol.datawedge.data_string");
-            String decodedLabelType = intent.getStringExtra("com.symbol.datawedge.label_type");
+            try {
+                String data   = intent.getStringExtra("com.symbol.datawedge.data_string");
+                String format = intent.getStringExtra("com.symbol.datawedge.label_type");
+                Date datetime = Calendar.getInstance().getTime();
+                String date   = new SimpleDateFormat("dd/MM/yyyy HH:mm:ss.SSS").format(datetime).toString();
 
-            // create a json object which will be returned to Flutter part
-            JSONObject json = new JSONObject();
-            try{
-                json.put("decodedSource",decodedSource);
-                json.put("decodedData",decodedData);
-                json.put("decodedLabelType",decodedLabelType);
-                //if (listener != null) listener.onZebraListenerSuccess(json.);
-            }catch(Exception e){
-                // catch json exceptions
-                //sink.success(e.toString());
+                // create a map of simple objects
+                HashMap<String, Object> tag = new HashMap<>();
+                tag.put("barcode", data);
+                tag.put("format", format);
+                tag.put("seen", date);
+
+                // notify listener
+                Log.d(TAG, ZebraEvents.readBarcode + ": " + tag);
+                if (listener != null) {
+                    listener.notify(INTERFACE, ZebraEvents.readBarcode, tag);
+                }
             }
+            catch(Exception e) {
+                Log.e(TAG, "Error deserializing json object" + e.getMessage());
+                if (listener != null) listener.notify(INTERFACE, ZebraEvents.error, ZebraDevice.toError("onReceive()", e));
+            }{}
         }
     }
 

@@ -1,12 +1,32 @@
 import 'dart:async';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
-import 'dart:convert';
+import 'package:collection/collection.dart';
 
-typedef ErrorCallback = void Function(ErrorResult error);
-typedef ReadCallback = void Function(List<TagData> data);
-typedef ConnectionCallback = void Function(ConnectionStatus status);
+typedef Callback = void Function(ZebraInterfaces source, ZebraEvents event, dynamic data);
 
 enum Mode {barcode, rfid}
+
+enum ZebraInterfaces {
+  zebraSdk,
+  dataWedge,
+  unknown
+}
+
+enum ZebraEvents {
+  readRfid,
+  readBarcode,
+  error,
+  connectionStatus,
+  unknown
+}
+
+enum ZebraConnectionStatus {
+  disconnected,
+  connected,
+  error,
+  unknown
+}
 
 class Zebra123 {
 
@@ -16,14 +36,10 @@ class Zebra123 {
 
   static const eventChannel = EventChannel('dev.fml.zebra123/event');
 
-  final ReadCallback readCallback;
-  final ConnectionCallback connectionCallback;
-  final ErrorCallback errorCallback;
+  final Callback callback;
 
   Zebra123({
-    required this.readCallback,
-    required this.connectionCallback,
-    required this.errorCallback,
+    required this.callback
   });
 
   Future connect({String? method}) async {
@@ -35,42 +51,74 @@ class Zebra123 {
     methodChannel.invokeMethod("mode", {"mode": mode});
   }
 
-  void _eventListener(dynamic event) {
+  /// Returns a String name given an Enum Type
+  static String? fromEnum(Object? e) {
+    try {
+      return e.toString().split('.').last;
+    } catch (e) {
+      return null;
+    }
+  }
 
-    final map = Map<String, dynamic>.from(event);
-    final name = map['eventName'] as String;
+  static T? toEnum<T>(String? key, List<T> values) {
+    try {
+      return values.firstWhereOrNull((v) => key == fromEnum(v));
+    } catch (e) {
+      return null;
+    }
+  }
 
-    switch (name) {
+  void _eventListener(dynamic payload) {
 
-      case 'ReadRfid':
-        List<dynamic> tags = map["tags"];
-        List<TagData> list = [];
-        for (var i = 0; i < tags.length; i++) {
-          list.add(TagData.fromMap(Map<String, dynamic>.from(tags[i])));
-        }
-        readCallback.call(list);
-        break;
+    try {
 
-     case 'Error':
-        var ss = ErrorResult.fromMap(map);
-        errorCallback.call(ss);
-        break;
+      final   map    = Map<String, dynamic>.from(payload);
+      final   source = toEnum(map['eventSource'] as String, ZebraInterfaces.values) ?? ZebraInterfaces.unknown;
+      final   event  = toEnum(map['eventName'] as String, ZebraEvents.values) ?? ZebraEvents.unknown;
+      dynamic data   = map['data'];
 
-      case 'ConnectionStatus':
-        ConnectionStatus status = ConnectionStatus.values[map["status"] as int];
-        connectionCallback.call(status);
-        break;
+      switch (event) {
+
+        case ZebraEvents.readRfid:
+          List<RfidTag> list = [];
+          List<dynamic> tags = map["tags"];
+          for (var i = 0; i < tags.length; i++) {
+            var tag = Map<String, dynamic>.from(tags[i]);
+            list.add(RfidTag.fromMap(tag));
+          }
+          data = list;
+          break;
+
+        case ZebraEvents.readBarcode:
+
+          List<Barcode> list = [];
+          var tag = Barcode.fromMap(map);
+          list.add(tag);
+          data = list;
+          break;
+
+        case ZebraEvents.error:
+          data = Error.fromMap(map);
+          break;
+
+        case ZebraEvents.connectionStatus:
+          data = ConnectionStatus.fromMap(map);
+          break;
+
+        default:
+          break;
+      }
+
+      // perform callback
+      callback(source, event, data);
+    }
+    catch (e) {
+      if (kDebugMode) print(e);
     }
   }
 }
 
-enum ConnectionStatus {
-  disconnected,
-  connected,
-  error
-}
-
-class TagData {
+class RfidTag {
 
   String id;
   int antenna;
@@ -79,8 +127,10 @@ class TagData {
   String memoryBankData;
   String lockData;
   int size;
+  String seen;
 
-  TagData({
+  RfidTag(
+  {
     required this.id,
     required this.antenna,
     required this.rssi,
@@ -88,6 +138,7 @@ class TagData {
     required this.memoryBankData,
     required this.lockData,
     required this.size,
+    required this.seen,
   });
 
   Map<String, dynamic> toMap() {
@@ -99,11 +150,12 @@ class TagData {
       'memoryBankData': memoryBankData,
       'lockData': lockData,
       'size': size,
+      'seen': seen,
     };
   }
 
-  factory TagData.fromMap(Map<String, dynamic> map) {
-    return TagData(
+  factory RfidTag.fromMap(Map<String, dynamic> map) {
+    return RfidTag(
       id: map['id'] ?? '',
       antenna: map['antenna']?.toInt() ?? 0,
       rssi: map['rssi']?.toInt() ?? 0,
@@ -111,40 +163,88 @@ class TagData {
       memoryBankData: map['memoryBankData'] ?? '',
       lockData: map['lockData'] ?? '',
       size: map['size']?.toInt() ?? 0,
+      seen: map['seen'] ?? '',
     );
   }
-
-  String toJson() => json.encode(toMap());
-
-  factory TagData.fromJson(String source) =>
-      TagData.fromMap(json.decode(source));
 }
 
-class ErrorResult {
-  int code = -1;
-  String errorMessage = "";
-  ErrorResult({
-    required this.code,
-    required this.errorMessage,
+class Barcode {
+
+  String barcode;
+  String format;
+  String seen;
+
+  Barcode(
+  {
+    required this.barcode,
+    required this.format,
+    required this.seen,
   });
 
   Map<String, dynamic> toMap() {
     return {
-      'code': code,
-      'errorMessage': errorMessage,
+      'barcode': barcode,
+      'format': format,
+      'seen': seen
     };
   }
 
-  factory ErrorResult.fromMap(Map<String, dynamic> map) {
-    return ErrorResult(
-      code: map['code']?.toInt() ?? 0,
-      errorMessage: map['errorMessage'] ?? '',
+  factory Barcode.fromMap(Map<String, dynamic> map) {
+    return Barcode(
+      barcode: map['barcode'] ?? '',
+      format: map['format'] ?? '',
+      seen: map['seen'] ?? '',
     );
   }
+}
 
-  String toJson() => json.encode(toMap());
+class ConnectionStatus {
 
-  factory ErrorResult.fromJson(String source) =>
-      ErrorResult.fromMap(json.decode(source));
+  ZebraConnectionStatus status = ZebraConnectionStatus.unknown;
+
+  ConnectionStatus({
+    required this.status,
+  });
+
+  Map<String, dynamic> toMap() {
+    return {
+      'status': Zebra123.fromEnum(status) ?? ZebraConnectionStatus.unknown,
+    };
+  }
+
+  factory ConnectionStatus.fromMap(Map<String, dynamic> map) {
+    return ConnectionStatus(
+      status: Zebra123.toEnum(map['status'], ZebraConnectionStatus.values) ?? ZebraConnectionStatus.unknown,
+    );
+  }
+}
+
+class Error {
+
+  String source = "";
+  String message = "";
+  String trace = "";
+
+  Error({
+    required this.source,
+    required this.message,
+    required this.trace,
+  });
+
+  Map<String, dynamic> toMap() {
+    return {
+      'source': source,
+      'message': message,
+      'trace': trace,
+    };
+  }
+
+  factory Error.fromMap(Map<String, dynamic> map) {
+    return Error(
+      source: map['source'] ?? "",
+      message: map['message'] ?? "",
+      trace: map['trace'] ?? "",
+    );
+  }
 }
 

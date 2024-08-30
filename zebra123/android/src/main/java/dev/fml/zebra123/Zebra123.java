@@ -27,29 +27,29 @@ public class Zebra123 implements FlutterPlugin, MethodCallHandler, StreamHandler
   private MethodChannel oMethodHandler;
   private EventChannel  oEventHandler;
 
-  public Handler oHandler = new Handler(Looper.getMainLooper());
+  private Handler handler = new Handler(Looper.getMainLooper());
 
   private EventChannel.EventSink sink = null;
 
   private ZebraDevice device;
 
-  private Context oContext;
+  private Context context;
 
   private final String TAG = "Zebra123";
-  public  final String METHODCHANNEL = "dev.fml.zebra123/method";
-  public  final String EVENTCHANNEL = "dev.fml.zebra123/event";
+  private final String METHODCHANNEL = "dev.fml.zebra123/method";
+  private final String EVENTCHANNEL = "dev.fml.zebra123/event";
 
   @Override
   public void onAttachedToEngine(@NonNull FlutterPluginBinding flutterPluginBinding) {
 
-    oContext = flutterPluginBinding.getApplicationContext();
+    context = flutterPluginBinding.getApplicationContext();
 
     // device supports rfid?
-    boolean isRfid = ZebraRfid.isSupported(oContext);
+    boolean isRfid = ZebraRfid.isSupported(context);
     if (isRfid) {
-      device = new ZebraRfid(oContext, this);
+      device = new ZebraRfid(context, this);
     } else {
-      device = new ZebraDataWedge(oContext, this);
+      device = new ZebraDataWedge(context, this);
     }
 
     oMethodHandler = new MethodChannel(flutterPluginBinding.getBinaryMessenger(), METHODCHANNEL);
@@ -71,7 +71,7 @@ public class Zebra123 implements FlutterPlugin, MethodCallHandler, StreamHandler
         break;
 
       case "toast":
-        Toast.makeText(oContext, call.argument("text"), Toast.LENGTH_LONG).show();
+        Toast.makeText(context, call.argument("text"), Toast.LENGTH_LONG).show();
         break;
 
       case "connect":
@@ -94,7 +94,7 @@ public class Zebra123 implements FlutterPlugin, MethodCallHandler, StreamHandler
 
       // not implemented
       default:
-        Toast.makeText(oContext, "Method not implemented: " + method, Toast.LENGTH_LONG).show();
+        Toast.makeText(context, "Method not implemented: " + method, Toast.LENGTH_LONG).show();
     }
   }
 
@@ -118,10 +118,12 @@ public class Zebra123 implements FlutterPlugin, MethodCallHandler, StreamHandler
   }
 
   @Override
-  public void notify(final String event, final HashMap map) {
+  public void notify(final ZebraDevice.ZebraInterfaces source, final ZebraDevice.ZebraEvents event, final HashMap map) {
 
-    map.put("eventName", event);
-    oHandler.post(() -> {
+    map.put("eventSource", source.toString());
+    map.put("eventName", event.toString());
+
+    handler.post(() -> {
       if (sink != null) {
         try {
           sink.success(map);
@@ -130,10 +132,5 @@ public class Zebra123 implements FlutterPlugin, MethodCallHandler, StreamHandler
         }
       }
     });
-  }
-
-  @Override
-  public void notify(final String event, final Exception exception) {
-
   }
 }

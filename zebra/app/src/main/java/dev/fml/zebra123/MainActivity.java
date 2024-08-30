@@ -25,13 +25,8 @@ public class MainActivity extends AppCompatActivity implements ZebraDeviceListen
     }
 
     @Override
-    public void notify(final String event, final HashMap map) {
+    public void notify(final ZebraDevice.ZebraInterfaces source, final ZebraDevice.ZebraEvents event, final HashMap map) {
+        map.put("eventSource", source);
         map.put("eventName", event);
     }
-
-    @Override
-    public void notify(final String event, final Exception exception) {
-
-    }
-
 }

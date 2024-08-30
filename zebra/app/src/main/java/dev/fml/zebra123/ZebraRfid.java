@@ -30,13 +30,17 @@ import com.zebra.rfid.api3.TagData;
 import com.zebra.rfid.api3.TriggerInfo;
 
 import java.lang.reflect.Field;
+import java.text.SimpleDateFormat;
 import java.util.ArrayList;
+import java.util.Calendar;
+import java.util.Date;
 import java.util.HashMap;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
 public class ZebraRfid implements Readers.RFIDReaderEventHandler, ZebraDevice {
 
+    private static final ZebraInterfaces INTERFACE = ZebraInterfaces.zebraSdk;
     private static String TAG = "zebra123";
 
     Context context;
@@ -178,13 +182,13 @@ public class ZebraRfid implements Readers.RFIDReaderEventHandler, ZebraDevice {
 
             @Override
             public void onPostExecute() {
-                ConnectionStatus status=ConnectionStatus.connected;
+
                 HashMap<String, Object> map = new HashMap<>();
-                map.put("status", status.ordinal());
+                map.put("status", ZebraConnectionStatus.connected.toString());
 
                 // notify device
                 if (listener != null) {
-                    listener.notify(ZebraEvents.ConnectionStatus,map);
+                    listener.notify(INTERFACE, ZebraEvents.connectionStatus,map);
                 }
             }
 
@@ -203,11 +207,11 @@ public class ZebraRfid implements Readers.RFIDReaderEventHandler, ZebraDevice {
                 readers.Dispose();
                 readers = null;
                 HashMap<String, Object> map =new HashMap<>();
-                map.put("status", ConnectionStatus.disconnected.ordinal());
+                map.put("status", ZebraConnectionStatus.disconnected.toString());
 
                 // notify device
                 if (listener != null) {
-                    listener.notify(ZebraEvents.ConnectionStatus,map);
+                    listener.notify(INTERFACE, ZebraEvents.connectionStatus,map);
                 }
             }
         } catch (Exception e) {
@@ -272,16 +276,8 @@ public class ZebraRfid implements Readers.RFIDReaderEventHandler, ZebraDevice {
         }
         catch (Exception e)
         {
-            // notify listener
-            if (listener != null) {
-                ErrorResult error = ErrorResult.error(e.getMessage());
-                HashMap<String, Object> map = transitionEntity(error);
-
-                // notify device
-                if (listener != null) {
-                    listener.notify(ZebraEvents.Error,e);
-                }
-            }
+            Log.e(TAG, "Error in getReadersList" + e.getMessage());
+            if (listener != null) listener.notify(INTERFACE, ZebraEvents.error, ZebraDevice.toError("getReadersList()", e));
         }
 
         return  readersListArray;
@@ -411,7 +407,7 @@ public class ZebraRfid implements Readers.RFIDReaderEventHandler, ZebraDevice {
 
                 // notify listener
                 if (listener != null) {
-                    listener.notify(ZebraEvents.ReadRfid,hashMap);
+                    listener.notify(INTERFACE, ZebraEvents.readRfid,hashMap);
                 }
             }
         }
@@ -455,19 +451,8 @@ public class ZebraRfid implements Readers.RFIDReaderEventHandler, ZebraDevice {
         return hashMap;
     }
 
-    public  static  class ZebraEvents {
-        static String Error = "Error";
-        static String ReadRfid = "ReadRfid";
-        static String ConnectionStatus = "ConnectionStatus";
-    }
+    private static class TagInfo {
 
-    enum ConnectionStatus {
-        disconnected,
-        connected,
-        error
-    }
-
-    public static class TagInfo {
         public String id;
         public short antenna;
         public short rssi;
@@ -476,26 +461,13 @@ public class ZebraRfid implements Readers.RFIDReaderEventHandler, ZebraDevice {
         public String memoryBankData;
         public String lockData;
         public int size;
-    }
+        public String seen;
 
-    public static class ErrorResult {
-
-        public static ErrorResult error(String errorMessage, int code) {
-            ErrorResult result=new ErrorResult();
-            result.errorMessage=errorMessage;
-            result.code=code;
-            return result;
-
+        TagInfo() {
+            Date datetime = Calendar.getInstance().getTime();
+            String date   = new SimpleDateFormat("dd/MM/yyyy HH:mm:ss.SSS").format(datetime).toString();
+            this.seen = date;
         }
-
-        public  static ErrorResult error(String errorMessage) {
-            ErrorResult result=new ErrorResult();
-            result.errorMessage=errorMessage;
-            return result;
-        }
-
-        int code = -1;
-        String errorMessage = "";
     }
 
     public abstract class AsyncTasks {

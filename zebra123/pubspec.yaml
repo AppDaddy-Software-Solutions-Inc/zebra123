@@ -1,7 +1,8 @@
 name: zebra123
 description: "Zebra Plugin"
-version: 0.0.1
-homepage:
+version: 1.0.0
+homepage: https://fml.dev
+repository: https://github.com/AppDaddy-Software-Solutions-Inc/Flutter-Markup-Language.git
 
 environment:
   sdk: '>=3.4.4 <4.0.0'

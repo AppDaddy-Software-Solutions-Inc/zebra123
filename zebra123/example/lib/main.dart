@@ -19,11 +19,7 @@ class _MyAppState extends State<MyApp> {
 
   @override
   void initState() {
-    zebra123 = Zebra123(
-      readCallback: readCallback,
-      connectionCallback: connectionCallback,
-      errorCallback: errorCallback,
-    );
+    zebra123 = Zebra123(callback: callback);
     super.initState();
   }
 
@@ -46,23 +42,42 @@ class _MyAppState extends State<MyApp> {
     );
   }
 
-  void errorCallback(ErrorResult error) {
-    if (kDebugMode) {
-      print("Error: ${error.errorMessage}");
-    }
-  }
+  void callback(ZebraInterfaces source, ZebraEvents event, dynamic data) {
 
-  void readCallback(List<TagData> data) {
-    if (kDebugMode) {
-      for (TagData tag in data) {
-        print("Tag: ${tag.id} Rssi: ${tag.rssi}");
-      }
-    }
-  }
+    switch (event) {
 
-  void connectionCallback(ConnectionStatus status) {
-    if (kDebugMode) {
-        print("Connection Status: $status");
+      case ZebraEvents.readBarcode:
+        if (data is List<Barcode>) {
+          for (Barcode barcode in data) {
+            if (kDebugMode) print("Barcode: ${barcode.barcode} Format: ${barcode.format} Date: ${barcode.seen} Source: $source");
+          }
+        }
+        break;
+
+      case ZebraEvents.readRfid:
+        if (data is List<RfidTag>) {
+          for (RfidTag tag in data) {
+            if (kDebugMode) print("Tag: ${tag.id} Rssi: ${tag.rssi}");
+          }
+        }
+        break;
+
+      case ZebraEvents.error:
+        if (data is Error) {
+          if (kDebugMode) print("Error: ${data.message}");
+        }
+        break;
+
+      case ZebraEvents.connectionStatus:
+        if (data is ConnectionStatus) {
+          if (kDebugMode) print("Connection Status: ${data.status}");
+        }
+        break;
+
+      default:
+        if (kDebugMode) {
+          if (kDebugMode) print("Unknown Event: $event");
+        }
     }
   }
 }
