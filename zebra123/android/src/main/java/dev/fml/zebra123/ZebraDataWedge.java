@@ -4,6 +4,7 @@ import android.content.BroadcastReceiver;
 import android.content.Context;
 import android.content.Intent;
 import android.content.IntentFilter;
+import android.os.Build;
 import android.os.Bundle;
 import android.os.Parcelable;
 import android.util.Log;
@@ -18,15 +19,15 @@ import java.util.HashMap;
 
 public final class ZebraDataWedge extends BroadcastReceiver implements ZebraDevice {
 
+    private static final String TAG = Zebra123.PLUGIN;
+
     private static final ZebraInterfaces INTERFACE = ZebraInterfaces.dataWedge;
 
-    private static String TAG = "zebra123";
-    private static final String PROFILE = "dev.fml.zebra123";
 
     private Context context;
     ZebraDeviceListener listener;
 
-    public static final String PROFILE_INTENT_ACTION = PROFILE;
+    public static final String PROFILE_INTENT_ACTION = TAG;
     public static final String PROFILE_INTENT_BROADCAST = "2";
     public static final String DATAWEDGE_SEND_ACTION = "com.symbol.datawedge.api.ACTION";
     public static final String DATAWEDGE_RETURN_ACTION = "com.symbol.datawedge.api.RESULT_ACTION";
@@ -45,17 +46,28 @@ public final class ZebraDataWedge extends BroadcastReceiver implements ZebraDevi
         this.listener = listener;
 
         this.createProfile();
-
-        final IntentFilter filter = new IntentFilter();
-        filter.addCategory(Intent.CATEGORY_DEFAULT);
-        filter.addAction(PROFILE); // Please use this String in your DataWedge profile configuration
-        context.registerReceiver(this, filter);
     }
 
+    public static boolean isSupported(Context context) {
+
+        try {
+            String deviceName = Build.MANUFACTURER;
+
+            Intent i = new Intent();
+            i.setAction("com.symbol.datawedge.api.ACTION");
+            i.putExtra("com.symbol.datawedge.api.GET_VERSION_INFO", "");
+            context.sendBroadcast(i);
+            return true;
+        }
+        catch(Exception e) {
+            Log.d(TAG, "Reader does not support Data Wedge");
+        }
+        return false;
+    }
     @Override
     public void onReceive(Context context, Intent intent) {
         String action = intent.getAction();
-        if (action.equals(PROFILE)) {
+        if (action.equals(TAG)) {
 
             try {
                 String data   = intent.getStringExtra("com.symbol.datawedge.data_string");
@@ -103,11 +115,51 @@ public final class ZebraDataWedge extends BroadcastReceiver implements ZebraDevi
     @Override
     public void connect() {
 
+        try {
+
+            final IntentFilter filter = new IntentFilter();
+            filter.addCategory(Intent.CATEGORY_DEFAULT);
+            filter.addAction(TAG); // Please use this String in your DataWedge profile configuration
+            context.registerReceiver(this, filter);
+
+            HashMap<String, Object> map =new HashMap<>();
+            map.put("status", ZebraConnectionStatus.connected.toString());
+
+            // notify device
+            if (listener != null) {
+                listener.notify(INTERFACE, ZebraEvents.connectionStatus,map);
+            }
+        }
+        catch(Exception e) {
+            Log.e(TAG, "Error connecting to device" + e.getMessage());
+            if (listener != null) listener.notify(INTERFACE, ZebraEvents.error, ZebraDevice.toError("connect()", e));
+        }
     }
 
     @Override
     public void disconnect() {
 
+        try {
+            context.unregisterReceiver(this);
+
+            HashMap<String, Object> map =new HashMap<>();
+            map.put("status", ZebraConnectionStatus.disconnected.toString());
+
+            // notify device
+            if (listener != null) {
+                listener.notify(INTERFACE, ZebraEvents.connectionStatus,map);
+            }
+        }
+        catch(Exception e) {
+            Log.e(TAG, "Error disconnecting from device" + e.getMessage());
+            if (listener != null) listener.notify(INTERFACE, ZebraEvents.error, ZebraDevice.toError("disconnect()", e));
+        }
+    }
+
+    @Override
+    public void dispose() {
+        listener = null;
+        context.unregisterReceiver(this);
     }
 
     @Override
@@ -117,16 +169,18 @@ public final class ZebraDataWedge extends BroadcastReceiver implements ZebraDevi
 
     private void createProfile() {
 
+        String profile = context.getPackageName() + "." + TAG;
+
         // create the profile if it doesnt exist
-        sendCommandString("com.symbol.datawedge.api.CREATE_PROFILE", PROFILE, false);
+        sendCommandString("com.symbol.datawedge.api.CREATE_PROFILE", profile, false);
 
         Bundle dwProfile = new Bundle();
-        dwProfile.putString("PROFILE_NAME", PROFILE);
+        dwProfile.putString("PROFILE_NAME", profile);
         dwProfile.putString("PROFILE_ENABLED", "true");
         dwProfile.putString("CONFIG_MODE", "UPDATE");
 
         Bundle appConfig = new Bundle();
-        appConfig.putString("PACKAGE_NAME", PROFILE);
+        appConfig.putString("PACKAGE_NAME", context.getPackageName());
 
         String[] var4 = new String[]{"*"};
         appConfig.putStringArray("ACTIVITY_LIST", var4);
@@ -138,7 +192,7 @@ public final class ZebraDataWedge extends BroadcastReceiver implements ZebraDevi
 
         Bundle intentPluginProperyties = new Bundle();
         intentPluginProperyties.putString("intent_output_enabled", "true");
-        intentPluginProperyties.putString("intent_action", PROFILE);
+        intentPluginProperyties.putString("intent_action", TAG);
         intentPluginProperyties.putString("intent_delivery", "2");
 
         Bundle intentPlugin = new Bundle();

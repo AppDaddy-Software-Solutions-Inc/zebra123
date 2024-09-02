@@ -40,8 +40,9 @@ import java.util.concurrent.Executors;
 
 public class ZebraRfid implements Readers.RFIDReaderEventHandler, ZebraDevice {
 
+    private static final String TAG = Zebra123.PLUGIN;
+
     private static final ZebraInterfaces INTERFACE = ZebraInterfaces.zebraSdk;
-    private static String TAG = "zebra123";
 
     Context context;
 
@@ -148,7 +149,6 @@ public class ZebraRfid implements Readers.RFIDReaderEventHandler, ZebraDevice {
         Readers.attach(this);
         if (readers == null) {
             readers = new Readers(context,ENUM_TRANSPORT.ALL);
-            //readers = new Readers(context, ENUM_TRANSPORT.SERVICE_SERIAL);
         }
 
         new AsyncTasks() {
@@ -201,18 +201,17 @@ public class ZebraRfid implements Readers.RFIDReaderEventHandler, ZebraDevice {
 
     public void disconnect() {
         try {
-            if (readers != null) {
-                readerDevice=null;
-                reader = null;
-                readers.Dispose();
-                readers = null;
-                HashMap<String, Object> map =new HashMap<>();
-                map.put("status", ZebraConnectionStatus.disconnected.toString());
+            readerDevice=null;
+            reader = null;
+            if (readers != null) readers.Dispose();
+            readers = null;
 
-                // notify device
-                if (listener != null) {
-                    listener.notify(INTERFACE, ZebraEvents.connectionStatus,map);
-                }
+            HashMap<String, Object> map =new HashMap<>();
+            map.put("status", ZebraConnectionStatus.disconnected.toString());
+
+            // notify device
+            if (listener != null) {
+                listener.notify(INTERFACE, ZebraEvents.connectionStatus,map);
             }
         } catch (Exception e) {
             e.printStackTrace();

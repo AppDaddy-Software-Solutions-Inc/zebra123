@@ -1,6 +1,6 @@
 name: zebra123
-description: "Zebra Plugin"
-version: 1.0.0
+description: "Zebra123 Plugin"
+version: 1.0.3
 homepage: https://fml.dev
 repository: https://github.com/AppDaddy-Software-Solutions-Inc/Flutter-Markup-Language.git
 
@@ -12,6 +12,8 @@ dependencies:
   flutter:
     sdk: flutter
   plugin_platform_interface: ^2.0.2
+
+  collection: ^1.18.0
 
 dev_dependencies:
   flutter_test:

@@ -21,6 +21,12 @@ enum ZebraEvents {
   unknown
 }
 
+enum ZebraConnectionMethod {
+  wedge,
+  sdk,
+  either
+}
+
 enum ZebraConnectionStatus {
   disconnected,
   connected,
@@ -42,9 +48,14 @@ class Zebra123 {
     required this.callback
   });
 
-  Future connect({String? method}) async {
+  Future connect({ZebraConnectionMethod method = ZebraConnectionMethod.either}) async {
     sink ??= eventChannel.receiveBroadcastStream().listen(_eventListener);
-    methodChannel.invokeMethod("connect", {"method": method});
+    methodChannel.invokeMethod("connect", {"method": fromEnum(method)});
+  }
+
+  Future disconnect() async {
+    sink ??= eventChannel.receiveBroadcastStream().listen(_eventListener);
+    methodChannel.invokeMethod("disconnect");
   }
 
   Future setMode(String mode) async {

@@ -33,7 +33,7 @@ class _MyAppState extends State<MyApp> {
     return MaterialApp(
       home: Scaffold(
         appBar: AppBar(
-          title: const Text('Zebra123 Plugin EXample'),
+          title: const Text('Zebra123 Plugin Example'),
         ),
         body: Center(
           child: Column(mainAxisSize: MainAxisSize.min, children: [connectBtn, barcodeBtn, rfidBtn]),

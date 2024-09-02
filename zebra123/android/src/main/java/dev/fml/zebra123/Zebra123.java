@@ -20,12 +20,18 @@ import io.flutter.plugin.common.MethodChannel.Result;
 
 /** Zebra123 */
 public class Zebra123 implements FlutterPlugin, MethodCallHandler, StreamHandler, ZebraDeviceListener {
+
+  public  final static String PLUGIN = "zebra123";
+  private final static String TAG = PLUGIN;
+
+  private static final ZebraDevice.ZebraInterfaces INTERFACE = ZebraDevice.ZebraInterfaces.unknown;
+
   /// The MethodChannel that will the communication between Flutter and native Android
   ///
   /// This local reference serves to register the plugin with the Flutter Engine and unregister it
   /// when the Flutter Engine is detached from the Activity
-  private MethodChannel oMethodHandler;
-  private EventChannel  oEventHandler;
+  private MethodChannel methodHandler;
+  private EventChannel eventHandler;
 
   private Handler handler = new Handler(Looper.getMainLooper());
 
@@ -35,7 +41,6 @@ public class Zebra123 implements FlutterPlugin, MethodCallHandler, StreamHandler
 
   private Context context;
 
-  private final String TAG = "Zebra123";
   private final String METHODCHANNEL = "dev.fml.zebra123/method";
   private final String EVENTCHANNEL = "dev.fml.zebra123/event";
 
@@ -44,19 +49,11 @@ public class Zebra123 implements FlutterPlugin, MethodCallHandler, StreamHandler
 
     context = flutterPluginBinding.getApplicationContext();
 
-    // device supports rfid?
-    boolean isRfid = ZebraRfid.isSupported(context);
-    if (isRfid) {
-      device = new ZebraRfid(context, this);
-    } else {
-      device = new ZebraDataWedge(context, this);
-    }
+    methodHandler = new MethodChannel(flutterPluginBinding.getBinaryMessenger(), METHODCHANNEL);
+    methodHandler.setMethodCallHandler(this);
 
-    oMethodHandler = new MethodChannel(flutterPluginBinding.getBinaryMessenger(), METHODCHANNEL);
-    oMethodHandler.setMethodCallHandler(this);
-
-    oEventHandler = new EventChannel(flutterPluginBinding.getBinaryMessenger(), EVENTCHANNEL);
-    oEventHandler.setStreamHandler(this);
+    eventHandler = new EventChannel(flutterPluginBinding.getBinaryMessenger(), EVENTCHANNEL);
+    eventHandler.setStreamHandler(this);
   }
 
   @Override
@@ -75,20 +72,54 @@ public class Zebra123 implements FlutterPlugin, MethodCallHandler, StreamHandler
         break;
 
       case "connect":
-        // boolean  isBluetooth=call.argument("isBluetooth");
-        String _method = call.argument("method");
-        device.connect();
+        ZebraDevice.ZebraConnectionMethod _method = ZebraDevice.ZebraConnectionMethod.either;
+        try {
+          String param = call.argument("method");
+          if (param != null) ZebraDevice.ZebraConnectionMethod.valueOf(param);
+        }
+        catch (Exception e) {
+          _method = ZebraDevice.ZebraConnectionMethod.either;
+        }
+
+        // disconnect if already connected
+        if (device != null) device.disconnect();
+        device = null;
+
+        boolean tryWedge = _method != ZebraDevice.ZebraConnectionMethod.sdk;
+        boolean trySdk   = _method != ZebraDevice.ZebraConnectionMethod.wedge;
+
+        // device supports rfid?
+        if (trySdk && ZebraRfid.isSupported(context)) {
+          device = new ZebraRfid(context, this);
+          device.connect();
+        }
+
+        // datawedge supported?
+        else if (tryWedge && ZebraDataWedge.isSupported(context)) {
+          device = new ZebraDataWedge(context, this);
+          device.connect();
+        }
+
+        // no supported device
+        else {
+          HashMap<String, Object> map =new HashMap<>();
+          map.put("status", ZebraDevice.ZebraConnectionStatus.error.toString());
+
+          // notify device
+          notify(INTERFACE, ZebraDevice.ZebraEvents.connectionStatus,map);
+        }
         break;
 
       // set device mode
       case "mode":
+
         String mode = call.argument("mode");
-        device.setMode(mode);
+        if (device != null) device.setMode(mode);
         break;
 
       // disconnect from the device
       case "disconnect":
-        device.disconnect();
+        if (device != null) device.disconnect();
         result.success(null);
         break;
 
@@ -100,8 +131,9 @@ public class Zebra123 implements FlutterPlugin, MethodCallHandler, StreamHandler
 
   @Override
   public void onDetachedFromEngine(@NonNull FlutterPluginBinding binding) {
-    oMethodHandler.setMethodCallHandler(null);
-    oEventHandler.setStreamHandler(null);
+    methodHandler.setMethodCallHandler(null);
+    eventHandler.setStreamHandler(null);
+    if (device != null) device.dispose();
   }
 
 

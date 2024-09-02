@@ -22,6 +22,12 @@ public interface ZebraDevice {
         unknown
     }
 
+    enum ZebraConnectionMethod {
+        wedge,
+        sdk,
+        either
+    }
+
     enum ZebraConnectionStatus {
         disconnected,
         connected,
