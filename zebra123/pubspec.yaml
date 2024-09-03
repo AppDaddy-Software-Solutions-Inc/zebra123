@@ -1,6 +1,6 @@
 name: zebra123
-description: "Zebra123 Plugin"
-version: 1.0.3
+description: "Zebra Technologies RFID and Barcode Scanner Plugin. Integrates both the Zebra RFID API3 and Datawedge into a single Flutter Plugin."
+version: 1.0.4
 homepage: https://fml.dev
 repository: https://github.com/AppDaddy-Software-Solutions-Inc/Flutter-Markup-Language.git
 

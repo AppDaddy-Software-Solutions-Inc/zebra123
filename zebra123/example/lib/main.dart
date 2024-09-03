@@ -27,8 +27,7 @@ class _MyAppState extends State<MyApp> {
   Widget build(BuildContext context) {
 
     var connectBtn = OutlinedButton(onPressed: () => zebra123?.connect(), child: const Text("Connect"));
-    var barcodeBtn = OutlinedButton(onPressed: () => zebra123?.setMode("barcode"), child: const Text("Barcode Mode"));
-    var rfidBtn = OutlinedButton(onPressed: () => zebra123?.setMode("rfid"), child: const Text("RFID Mode"));
+    var disconnectBtn = OutlinedButton(onPressed: () => zebra123?.disconnect(), child: const Text("Disconnect"));
 
     return MaterialApp(
       home: Scaffold(
@@ -36,7 +35,7 @@ class _MyAppState extends State<MyApp> {
           title: const Text('Zebra123 Plugin Example'),
         ),
         body: Center(
-          child: Column(mainAxisSize: MainAxisSize.min, children: [connectBtn, barcodeBtn, rfidBtn]),
+          child: Column(mainAxisSize: MainAxisSize.min, children: [connectBtn, disconnectBtn]),
         ),
       ),
     );
