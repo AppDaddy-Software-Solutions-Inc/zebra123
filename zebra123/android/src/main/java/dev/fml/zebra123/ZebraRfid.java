@@ -28,6 +28,9 @@ import com.zebra.rfid.api3.STATUS_EVENT_TYPE;
 import com.zebra.rfid.api3.STOP_TRIGGER_TYPE;
 import com.zebra.rfid.api3.TagData;
 import com.zebra.rfid.api3.TriggerInfo;
+import com.zebra.rfid.api3.RegionInfo;
+import com.zebra.rfid.api3.RegulatoryConfig;
+import com.zebra.rfid.api3.AntennaInfo;
 
 import java.lang.reflect.Field;
 import java.text.SimpleDateFormat;
@@ -68,6 +71,26 @@ public class ZebraRfid implements Readers.RFIDReaderEventHandler, ZebraDevice {
             Log.d(TAG, "Reader does not support RFID");
         }
         return false;
+    }
+
+    private void setRegulatoryConfig() {
+
+        try {
+        if (reader != null) {
+            Log.e(TAG,"Setting region");
+
+            // Get and Set regulatory configuration settings
+            RegulatoryConfig regulatoryConfig = reader.Config.getRegulatoryConfig();
+            RegionInfo regionInfo = reader.ReaderCapabilities.SupportedRegions.getRegionInfo(1);
+            regulatoryConfig.setRegion(regionInfo.getRegionCode());
+            regulatoryConfig.setIsHoppingOn(regionInfo.isHoppingConfigurable());
+            regulatoryConfig.setEnabledChannels(regionInfo.getSupportedChannels());
+            reader.Config.setRegulatoryConfig(regulatoryConfig);
+        }
+        }
+        catch(Exception e) {
+            Log.e(TAG,"Error setting region");
+        }
     }
 
     public void setPowerLevel(int level) {
@@ -157,7 +180,6 @@ public class ZebraRfid implements Readers.RFIDReaderEventHandler, ZebraDevice {
     public void connect() {
 
         Readers.attach(this);
-        Log.d(TAG, "XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX");
 
         new AsyncTasks() {
 
@@ -170,6 +192,8 @@ public class ZebraRfid implements Readers.RFIDReaderEventHandler, ZebraDevice {
                         if (rfidReaders.size() > 0) {
                             ReaderDevice device = rfidReaders.get(0);
                             reader = device.getRFIDReader();
+
+                            //setRegulatoryConfig();
                             reader.connect();
                             ConfigureReader();
                         }
@@ -242,8 +266,6 @@ public class ZebraRfid implements Readers.RFIDReaderEventHandler, ZebraDevice {
             try {
 
                 Log.d(TAG, "###################################### ConfigureReader ");
-
-                reader.Config.resetFactoryDefaults();
 
                 // receive events from reader
                 setEvents();
@@ -369,11 +391,18 @@ public class ZebraRfid implements Readers.RFIDReaderEventHandler, ZebraDevice {
         try
         {
             Log.d(TAG, "STARTING INVENTORY");
-            reader.Actions.Inventory.perform();
+            reader.Config.Antennas.getSingulationControl(1).setSession(SESSION.SESSION_S0);
+
+            short[] allAntennas = new short[reader.ReaderCapabilities.getNumAntennaSupported()];
+            for(short i = 1; i<= reader.ReaderCapabilities.getNumAntennaSupported(); i++) {
+                allAntennas[i-1] = i;
+            }
+            AntennaInfo antennaInfo = new AntennaInfo(allAntennas);
+            reader.Actions.Inventory.perform(null, null, antennaInfo);
         }
         catch (Exception e)
         {
-            Log.e(TAG, "Error in performInventory(). Error is " + e.getMessage());
+            Log.e(TAG, "Error in performInventory(). Error is " + e.toString());
         }
     }
 

@@ -170,6 +170,13 @@ public class ZebraRfid implements Readers.RFIDReaderEventHandler, ZebraDevice {
 
                     if (reader != null && !reader.isConnected()) {
                         reader.connect();
+
+                        short[] allAntennas = new short[reader.ReaderCapabilities.getNumAntennaSupported()];
+                        for(short i = 1; i<= reader.ReaderCapabilities.getNumAntennaSupported(); i++) {
+                            allAntennas[i-1] = i;
+                        }
+                        reader.Actions.Inventory.perform(null, null, allAntennas);
+
                         ConfigureReader();
                     }
 
