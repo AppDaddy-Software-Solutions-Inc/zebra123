@@ -24,7 +24,7 @@ if (flutterVersionName == null) {
 }
 
 android {
-    namespace = "dev.fml.zebra123"
+    namespace = "dev.fml.zebra123_example"
     compileSdk = flutter.compileSdkVersion
     ndkVersion = flutter.ndkVersion
 
@@ -35,7 +35,7 @@ android {
 
     defaultConfig {
         // TODO: Specify your own unique Application ID (https://developer.android.com/studio/build/application-id.html).
-        applicationId = "dev.fml.zebra123"
+        applicationId = "dev.fml.zebra123_example"
         // You can update the following values to match your application needs.
         // For more information, see: https://docs.flutter.dev/deployment/android#reviewing-the-gradle-build-configuration.
         minSdk = flutter.minSdkVersion
@@ -48,6 +48,8 @@ android {
         release {
             // TODO: Add your own signing config for the release build.
             // Signing with the debug keys for now, so `flutter run --release` works.
+            shrinkResources false
+            minifyEnabled false
             signingConfig = signingConfigs.debug
         }
     }

@@ -10,8 +10,8 @@ public interface ZebraDevice {
     public void setMode(String mode);
 
     enum ZebraInterfaces {
-        zebraSdk,
-        dataWedge,
+        rfidapi3,
+        datawedge,
         unknown
     }
 
@@ -21,12 +21,6 @@ public interface ZebraDevice {
         error,
         connectionStatus,
         unknown
-    }
-
-    enum ZebraConnectionMethod {
-        wedge,
-        sdk,
-        either
     }
 
     enum ZebraConnectionStatus {

@@ -25,3 +25,20 @@
 ## 1.0.4
 
 * README.md updated
+
+## 1.0.5
+
+* README.md updated
+* Cancel sink
+
+## 1.0.6
+
+* Sink Bug Fix
+
+## 1.0.7
+
+* Modified Interface
+
+## 1.0.8
+
+* Modified Interface

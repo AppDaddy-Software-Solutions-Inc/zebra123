@@ -201,7 +201,9 @@ public class ZebraRfid implements Readers.RFIDReaderEventHandler, ZebraDevice {
 
     public void disconnect() {
         try {
+            Readers.deattach(this);
             readerDevice=null;
+            reader.Events.removeEventsListener();
             reader = null;
             if (readers != null) readers.Dispose();
             readers = null;
@@ -219,6 +221,7 @@ public class ZebraRfid implements Readers.RFIDReaderEventHandler, ZebraDevice {
     }
 
     private boolean isReaderConnected() {
+
         if (reader != null && reader.isConnected())
             return true;
         else {
@@ -232,6 +235,8 @@ public class ZebraRfid implements Readers.RFIDReaderEventHandler, ZebraDevice {
         if (reader.isConnected()) {
 
             try {
+
+                reader.Config.resetFactoryDefaults();
 
                 // receive events from reader
                 reader.Events.addEventsListener(eventHandler);

@@ -54,6 +54,20 @@ public class Zebra123 implements FlutterPlugin, MethodCallHandler, StreamHandler
 
     eventHandler = new EventChannel(flutterPluginBinding.getBinaryMessenger(), EVENTCHANNEL);
     eventHandler.setStreamHandler(this);
+
+    connect();
+  }
+
+  @Override
+  public void onDetachedFromEngine(@NonNull FlutterPluginBinding binding) {
+
+    methodHandler.setMethodCallHandler(null);
+    methodHandler = null;
+
+    eventHandler.setStreamHandler(null);
+    eventHandler = null;
+
+    disconnect();
   }
 
   @Override
@@ -63,79 +77,59 @@ public class Zebra123 implements FlutterPlugin, MethodCallHandler, StreamHandler
 
     switch (method) {
 
-      case "getPlatformVersion":
-        result.success("Android " + android.os.Build.VERSION.RELEASE);
-        break;
-
-      case "toast":
-        Toast.makeText(context, call.argument("text"), Toast.LENGTH_LONG).show();
-        break;
-
       case "connect":
-        ZebraDevice.ZebraConnectionMethod _method = ZebraDevice.ZebraConnectionMethod.either;
-        try {
-          String param = call.argument("method");
-          if (param != null) ZebraDevice.ZebraConnectionMethod.valueOf(param);
-        }
-        catch (Exception e) {
-          _method = ZebraDevice.ZebraConnectionMethod.either;
-        }
-
-        // disconnect if already connected
-        if (device != null) device.disconnect();
-        device = null;
-
-        boolean tryWedge = _method != ZebraDevice.ZebraConnectionMethod.sdk;
-        boolean trySdk   = _method != ZebraDevice.ZebraConnectionMethod.wedge;
-
-        // device supports rfid?
-        if (trySdk && ZebraRfid.isSupported(context)) {
-          device = new ZebraRfid(context, this);
-          device.connect();
-        }
-
-        // datawedge supported?
-        else if (tryWedge && ZebraDataWedge.isSupported(context)) {
-          device = new ZebraDataWedge(context, this);
-          device.connect();
-        }
-
-        // no supported device
-        else {
-          HashMap<String, Object> map =new HashMap<>();
-          map.put("status", ZebraDevice.ZebraConnectionStatus.error.toString());
-
-          // notify device
-          notify(INTERFACE, ZebraDevice.ZebraEvents.connectionStatus,map);
-        }
-        break;
-
-      // set device mode
-      case "mode":
-
-        String mode = call.argument("mode");
-        if (device != null) device.setMode(mode);
+        connect();
         break;
 
       // disconnect from the device
       case "disconnect":
-        if (device != null) device.disconnect();
-        result.success(null);
         break;
 
       // not implemented
       default:
         Toast.makeText(context, "Method not implemented: " + method, Toast.LENGTH_LONG).show();
     }
+
+    result.success(null);
   }
 
-  @Override
-  public void onDetachedFromEngine(@NonNull FlutterPluginBinding binding) {
-    methodHandler.setMethodCallHandler(null);
-    eventHandler.setStreamHandler(null);
-    if (device != null) device.dispose();
+  private void connect() {
+
+    try {
+      // disconnect if already connected
+      //if (device != null) device.disconnect();
+      device = null;
+
+      // device supports rfid?
+      if (ZebraRfid.isSupported(context)) {
+        device = new ZebraRfid(context, this);
+        device.connect();
+      }
+
+      // datawedge supported?
+      else if (ZebraDataWedge.isSupported(context)) {
+        device = new ZebraDataWedge(context, this);
+        device.connect();
+      }
+
+      // no supported device
+      else {
+        HashMap<String, Object> map =new HashMap<>();
+        map.put("status", ZebraDevice.ZebraConnectionStatus.error.toString());
+
+        // notify device
+        notify(INTERFACE, ZebraDevice.ZebraEvents.connectionStatus,map);
+      }
+    }
+    catch(Exception e) {
+        Log.e(TAG, "Error connecting to device" + e.getMessage());
+        notify(INTERFACE, ZebraDevice.ZebraEvents.error, ZebraDevice.toError("Error during connect()", e));
+    }
   }
 
+  private void disconnect() {
+    if (device != null) device.disconnect();
+  }
 
   @Override
   public void onListen(Object arguments, EventChannel.EventSink sink) {

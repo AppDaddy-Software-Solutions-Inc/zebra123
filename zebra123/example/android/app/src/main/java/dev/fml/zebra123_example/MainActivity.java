@@ -1,4 +1,4 @@
-package dev.fml.zebra123;
+package dev.fml.zebra123_example;
 
 import io.flutter.embedding.android.FlutterActivity;
 

@@ -1,131 +1,33 @@
 import 'dart:async';
-import 'package:flutter/foundation.dart';
-import 'package:flutter/services.dart';
 import 'package:collection/collection.dart';
+import 'package:zebra123/zebra_bridge.dart';
 
-typedef Callback = void Function(ZebraInterfaces source, ZebraEvents event, dynamic data);
-
-enum Mode {barcode, rfid}
-
-enum ZebraInterfaces {
-  zebraSdk,
-  dataWedge,
-  unknown
-}
-
-enum ZebraEvents {
-  readRfid,
-  readBarcode,
-  error,
-  connectionStatus,
-  unknown
-}
-
-enum ZebraConnectionMethod {
-  wedge,
-  sdk,
-  either
-}
-
-enum ZebraConnectionStatus {
-  disconnected,
-  connected,
-  error,
-  unknown
-}
+typedef Callback = void Function(ZebraInterfaces interface, ZebraEvents event, dynamic data);
 
 class Zebra123 {
 
-  static StreamSubscription<dynamic>? sink;
+  ZebraBridge _bridge = ZebraBridge();
 
-  static const methodChannel = MethodChannel("dev.fml.zebra123/method");
+  Callback callback;
 
-  static const eventChannel = EventChannel('dev.fml.zebra123/event');
+  Zebra123({required this.callback});
 
-  final Callback callback;
-
-  Zebra123({
-    required this.callback
-  });
-
-  Future connect({ZebraConnectionMethod method = ZebraConnectionMethod.either}) async {
-    sink ??= eventChannel.receiveBroadcastStream().listen(_eventListener);
-    methodChannel.invokeMethod("connect", {"method": fromEnum(method)});
+  Future connect() async {
+    if (_bridge.status == ZebraConnectionStatus.connected) {
+      callback(_bridge.interface, ZebraEvents.connectionStatus, ConnectionStatus(status: ZebraConnectionStatus.connected));
+    }
+    _bridge.addListener(this);
   }
 
   Future disconnect() async {
-    sink ??= eventChannel.receiveBroadcastStream().listen(_eventListener);
-    methodChannel.invokeMethod("disconnect");
+    if (_bridge.status == ZebraConnectionStatus.disconnected) {
+      callback(_bridge.interface, ZebraEvents.connectionStatus, ConnectionStatus(status: ZebraConnectionStatus.disconnected));
+    }
+    _bridge.removeListener(this);
   }
 
-  Future setMode(String mode) async {
-    methodChannel.invokeMethod("mode", {"mode": mode});
-  }
-
-  /// Returns a String name given an Enum Type
-  static String? fromEnum(Object? e) {
-    try {
-      return e.toString().split('.').last;
-    } catch (e) {
-      return null;
-    }
-  }
-
-  static T? toEnum<T>(String? key, List<T> values) {
-    try {
-      return values.firstWhereOrNull((v) => key == fromEnum(v));
-    } catch (e) {
-      return null;
-    }
-  }
-
-  void _eventListener(dynamic payload) {
-
-    try {
-
-      final   map    = Map<String, dynamic>.from(payload);
-      final   source = toEnum(map['eventSource'] as String, ZebraInterfaces.values) ?? ZebraInterfaces.unknown;
-      final   event  = toEnum(map['eventName'] as String, ZebraEvents.values) ?? ZebraEvents.unknown;
-      dynamic data   = map['data'];
-
-      switch (event) {
-
-        case ZebraEvents.readRfid:
-          List<RfidTag> list = [];
-          List<dynamic> tags = map["tags"];
-          for (var i = 0; i < tags.length; i++) {
-            var tag = Map<String, dynamic>.from(tags[i]);
-            list.add(RfidTag.fromMap(tag));
-          }
-          data = list;
-          break;
-
-        case ZebraEvents.readBarcode:
-
-          List<Barcode> list = [];
-          var tag = Barcode.fromMap(map);
-          list.add(tag);
-          data = list;
-          break;
-
-        case ZebraEvents.error:
-          data = Error.fromMap(map);
-          break;
-
-        case ZebraEvents.connectionStatus:
-          data = ConnectionStatus.fromMap(map);
-          break;
-
-        default:
-          break;
-      }
-
-      // perform callback
-      callback(source, event, data);
-    }
-    catch (e) {
-      if (kDebugMode) print(e);
-    }
+  Future dispose() async {
+    disconnect();
   }
 }
 
@@ -219,13 +121,13 @@ class ConnectionStatus {
 
   Map<String, dynamic> toMap() {
     return {
-      'status': Zebra123.fromEnum(status) ?? ZebraConnectionStatus.unknown,
+      'status': fromEnum(status) ?? ZebraConnectionStatus.unknown,
     };
   }
 
   factory ConnectionStatus.fromMap(Map<String, dynamic> map) {
     return ConnectionStatus(
-      status: Zebra123.toEnum(map['status'], ZebraConnectionStatus.values) ?? ZebraConnectionStatus.unknown,
+      status: toEnum(map['status'], ZebraConnectionStatus.values) ?? ZebraConnectionStatus.unknown,
     );
   }
 }
@@ -257,5 +159,46 @@ class Error {
       trace: map['trace'] ?? "",
     );
   }
+}
+
+/// Returns a String name given an Enum Type
+String? fromEnum(Object? e) {
+  try {
+    return e.toString().split('.').last;
+  } catch (e) {
+    return null;
+  }
+}
+
+/// Returns an Enum Type given a String name
+T? toEnum<T>(String? key, List<T> values) {
+  try {
+    return values.firstWhereOrNull((v) => key == fromEnum(v));
+  } catch (e) {
+    return null;
+  }
+}
+
+enum Mode {barcode, rfid}
+
+enum ZebraInterfaces {
+  rfidapi3,
+  datawedge,
+  unknown
+}
+
+enum ZebraEvents {
+  readRfid,
+  readBarcode,
+  error,
+  connectionStatus,
+  unknown
+}
+
+enum ZebraConnectionStatus {
+  disconnected,
+  connected,
+  error,
+  unknown
 }
 

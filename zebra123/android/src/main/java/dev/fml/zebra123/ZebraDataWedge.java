@@ -21,7 +21,7 @@ public final class ZebraDataWedge extends BroadcastReceiver implements ZebraDevi
 
     private static final String TAG = Zebra123.PLUGIN;
 
-    private static final ZebraInterfaces INTERFACE = ZebraInterfaces.dataWedge;
+    private static final ZebraInterfaces INTERFACE = ZebraInterfaces.datawedge;
 
 
     private Context context;

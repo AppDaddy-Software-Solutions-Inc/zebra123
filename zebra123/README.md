@@ -26,7 +26,19 @@ You can specfify the connection method using connect(method: dataWedge), connect
     }   
     ```
 
-4. In `AndroidManifest.xml` in the `android/app/src/main` folder,
+4. In `build.gradle` in the `android/app` folder, add to the `release` segnment:
+
+    ```javascript
+        release {
+
+            // necessary for zebra sdk in release mode
+            minifyEnabled false
+            shrinkResources false
+        }
+   ```
+   This is a temporay 'hack' until I can find a way to properly include the zebra sdk in release mode.
+
+5. In `AndroidManifest.xml` in the `android/app/src/main` folder,
 
    Add `xmlns:tools` directive to the top level manifest tag
    ```xml
@@ -44,7 +56,7 @@ You can specfify the connection method using connect(method: dataWedge), connect
         >
     ```
 
-7. In `android/app/build.gradle`, make sure the minSdkVersion is 19 or higher
+6. In `android/app/build.gradle`, make sure the minSdkVersion is 19 or higher
 
 
 ## Example

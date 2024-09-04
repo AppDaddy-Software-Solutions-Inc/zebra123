@@ -48,7 +48,7 @@ class _MyAppState extends State<MyApp> {
       case ZebraEvents.readBarcode:
         if (data is List<Barcode>) {
           for (Barcode barcode in data) {
-            if (kDebugMode) print("Source: $source Barcode: ${barcode.barcode} Format: ${barcode.format} Date: ${barcode.seen}");
+            print("Source: $source Barcode: ${barcode.barcode} Format: ${barcode.format} Date: ${barcode.seen}");
           }
         }
         break;
@@ -56,26 +56,26 @@ class _MyAppState extends State<MyApp> {
       case ZebraEvents.readRfid:
         if (data is List<RfidTag>) {
           for (RfidTag tag in data) {
-            if (kDebugMode) print("Source: $source Tag: ${tag.id} Rssi: ${tag.rssi}");
+            print("Source: $source Tag: ${tag.id} Rssi: ${tag.rssi}");
           }
         }
         break;
 
       case ZebraEvents.error:
         if (data is Error) {
-          if (kDebugMode) print("Source: $source Error: ${data.message}");
+          print("Source: $source Error: ${data.message}");
         }
         break;
 
       case ZebraEvents.connectionStatus:
         if (data is ConnectionStatus) {
-          if (kDebugMode) print("Source: $source ConnectionStatus: ${data.status}");
+          print("Source: $source ConnectionStatus: ${data.status}");
         }
         break;
 
       default:
         if (kDebugMode) {
-          if (kDebugMode) print("Source: $source Unknown Event: $event");
+          print("Source: $source Unknown Event: $event");
         }
     }
   }
