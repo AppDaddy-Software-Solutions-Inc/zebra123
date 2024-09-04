@@ -26,12 +26,8 @@ public class Zebra123 implements FlutterPlugin, MethodCallHandler, StreamHandler
 
   private static final ZebraDevice.ZebraInterfaces INTERFACE = ZebraDevice.ZebraInterfaces.unknown;
 
-  /// The MethodChannel that will the communication between Flutter and native Android
-  ///
-  /// This local reference serves to register the plugin with the Flutter Engine and unregister it
-  /// when the Flutter Engine is detached from the Activity
-  private MethodChannel methodHandler;
-  private EventChannel eventHandler;
+  private static MethodChannel methodHandler;
+  private static EventChannel eventHandler;
 
   private Handler handler = new Handler(Looper.getMainLooper());
 
@@ -49,9 +45,11 @@ public class Zebra123 implements FlutterPlugin, MethodCallHandler, StreamHandler
 
     context = flutterPluginBinding.getApplicationContext();
 
+    if (methodHandler != null) methodHandler.setMethodCallHandler(null);
     methodHandler = new MethodChannel(flutterPluginBinding.getBinaryMessenger(), METHODCHANNEL);
     methodHandler.setMethodCallHandler(this);
 
+    if (eventHandler != null) eventHandler.setStreamHandler(null);
     eventHandler = new EventChannel(flutterPluginBinding.getBinaryMessenger(), EVENTCHANNEL);
     eventHandler.setStreamHandler(this);
 
@@ -67,7 +65,7 @@ public class Zebra123 implements FlutterPlugin, MethodCallHandler, StreamHandler
     eventHandler.setStreamHandler(null);
     eventHandler = null;
 
-    disconnect();
+    //disconnect();
   }
 
   @Override
@@ -128,12 +126,14 @@ public class Zebra123 implements FlutterPlugin, MethodCallHandler, StreamHandler
   }
 
   private void disconnect() {
-    if (device != null) device.disconnect();
+    if (device != null) {
+      device.disconnect();
+    }
   }
 
   @Override
   public void onListen(Object arguments, EventChannel.EventSink sink) {
-    Log.w(TAG, "adding listener");
+    Log.d(TAG, ">>>>>>>>>>>>>>>>>>>>>>>>>>>>> Setting Sink");
     this.sink = sink;
   }
 
@@ -146,17 +146,22 @@ public class Zebra123 implements FlutterPlugin, MethodCallHandler, StreamHandler
   @Override
   public void notify(final ZebraDevice.ZebraInterfaces source, final ZebraDevice.ZebraEvents event, final HashMap map) {
 
-    map.put("eventSource", source.toString());
-    map.put("eventName", event.toString());
+    if (sink == null) Log.e(TAG, "Can't send notification to flutter. Sink is null");
 
-    handler.post(() -> {
-      if (sink != null) {
-        try {
-          sink.success(map);
-        } catch (Exception e) {
-          e.printStackTrace();
-        }
-      }
-    });
+    if (sink != null) {
+      handler.post(() -> {
+          try
+          {
+            map.put("eventSource", source.toString());
+            map.put("eventName", event.toString());
+            sink.success(map);
+          }
+          catch (Exception e)
+          {
+            Log.e(TAG, "Error sending notification to flutter");
+          }
+      });
+    }
   }
+
 }

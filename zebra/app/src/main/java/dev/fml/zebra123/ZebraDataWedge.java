@@ -19,9 +19,9 @@ import java.util.HashMap;
 
 public final class ZebraDataWedge extends BroadcastReceiver implements ZebraDevice {
 
-    private static final String TAG = Zebra123.PLUGIN;
+    private static final String TAG = "zebra123";
 
-    private static final ZebraInterfaces INTERFACE = ZebraInterfaces.dataWedge;
+    private static final ZebraInterfaces INTERFACE = ZebraInterfaces.datawedge;
 
 
     private Context context;
@@ -154,6 +154,12 @@ public final class ZebraDataWedge extends BroadcastReceiver implements ZebraDevi
             Log.e(TAG, "Error disconnecting from device" + e.getMessage());
             if (listener != null) listener.notify(INTERFACE, ZebraEvents.error, ZebraDevice.toError("disconnect()", e));
         }
+    }
+
+    @Override
+    public void dispose() {
+        listener = null;
+        context.unregisterReceiver(this);
     }
 
     @Override

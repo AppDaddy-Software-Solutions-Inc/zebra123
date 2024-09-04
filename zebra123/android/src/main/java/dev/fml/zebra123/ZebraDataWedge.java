@@ -19,7 +19,7 @@ import java.util.HashMap;
 
 public final class ZebraDataWedge extends BroadcastReceiver implements ZebraDevice {
 
-    private static final String TAG = Zebra123.PLUGIN;
+    private static final String TAG = "zebra123";
 
     private static final ZebraInterfaces INTERFACE = ZebraInterfaces.datawedge;
 
