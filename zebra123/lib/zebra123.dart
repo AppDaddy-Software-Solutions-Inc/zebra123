@@ -4,26 +4,54 @@ import 'package:zebra123/zebra_bridge.dart';
 
 typedef Callback = void Function(ZebraInterfaces interface, ZebraEvents event, dynamic data);
 
+/// Zebra RFID and DataWedge Interface
 class Zebra123 {
 
-  ZebraBridge _bridge = ZebraBridge();
+  late final ZebraBridge _bridge;
+  late final Callback _callback;
 
-  Callback callback;
+  ZebraConnectionStatus _connectionStatus = ZebraConnectionStatus.unknown;
+  ZebraConnectionStatus get connectionStatus {
 
-  Zebra123({required this.callback});
+    // if listening return zebra bridge connection status
+    if (_bridge.listeners.contains(this)) return _bridge.connectionStatus;
 
-  Future connect() async {
-    if (_bridge.status == ZebraConnectionStatus.connected) {
-      callback(_bridge.interface, ZebraEvents.connectionStatus, ConnectionStatus(status: ZebraConnectionStatus.connected));
-    }
+    // otherwise return disconnected
+    return ZebraConnectionStatus.disconnected;
+  }
+
+  Zebra123({required callback}) {
+    _callback = callback;
+    _bridge = ZebraBridge();
     _bridge.addListener(this);
   }
 
-  Future disconnect() async {
-    if (_bridge.status == ZebraConnectionStatus.disconnected) {
-      callback(_bridge.interface, ZebraEvents.connectionStatus, ConnectionStatus(status: ZebraConnectionStatus.disconnected));
+  Future connect() async {
+    if (!_bridge.listeners.contains(this)) {
+      _bridge.addListener(this);
+      _callback(_bridge.interface, ZebraEvents.connectionStatus, ConnectionStatus(status: connectionStatus));
     }
-    _bridge.removeListener(this);
+  }
+
+  Future disconnect() async {
+    if (_bridge.listeners.contains(this)) {
+      _bridge.removeListener(this);
+      _callback(_bridge.interface, ZebraEvents.connectionStatus, ConnectionStatus(status: ZebraConnectionStatus.disconnected));
+    }
+  }
+
+  void callback(ZebraInterfaces interface, ZebraEvents event, dynamic data) {
+
+    // only report back changes in connection status on change
+    if (data is ConnectionStatus) {
+      if (data.status != _connectionStatus) {
+        _connectionStatus = data.status;
+        _callback(interface, event, data);
+      }
+      return;
+    }
+
+    _callback(interface, event, data);
   }
 
   Future dispose() async {
@@ -41,6 +69,7 @@ class RfidTag {
   String lockData;
   int size;
   String seen;
+  ZebraInterfaces interface;
 
   RfidTag(
   {
@@ -52,20 +81,8 @@ class RfidTag {
     required this.lockData,
     required this.size,
     required this.seen,
+    required this.interface
   });
-
-  Map<String, dynamic> toMap() {
-    return {
-      'id': id,
-      'antenna': antenna,
-      'rssi': rssi,
-      'distance': distance,
-      'memoryBankData': memoryBankData,
-      'lockData': lockData,
-      'size': size,
-      'seen': seen,
-    };
-  }
 
   factory RfidTag.fromMap(Map<String, dynamic> map) {
     return RfidTag(
@@ -77,6 +94,7 @@ class RfidTag {
       lockData: map['lockData'] ?? '',
       size: map['size']?.toInt() ?? 0,
       seen: map['seen'] ?? '',
+      interface: toEnum(map['eventSource'],ZebraInterfaces.values) ?? ZebraInterfaces.unknown,
     );
   }
 }
@@ -86,27 +104,22 @@ class Barcode {
   String barcode;
   String format;
   String seen;
+  ZebraInterfaces interface;
 
   Barcode(
   {
     required this.barcode,
     required this.format,
     required this.seen,
+    required this.interface
   });
-
-  Map<String, dynamic> toMap() {
-    return {
-      'barcode': barcode,
-      'format': format,
-      'seen': seen
-    };
-  }
 
   factory Barcode.fromMap(Map<String, dynamic> map) {
     return Barcode(
       barcode: map['barcode'] ?? '',
       format: map['format'] ?? '',
       seen: map['seen'] ?? '',
+      interface: toEnum(map['eventSource'],ZebraInterfaces.values) ?? ZebraInterfaces.unknown,
     );
   }
 }

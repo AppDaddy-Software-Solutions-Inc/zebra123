@@ -6,7 +6,7 @@ import 'package:zebra123/zebra123.dart';
 class ZebraBridge {
 
   ZebraInterfaces interface = ZebraInterfaces.unknown;
-  ZebraConnectionStatus status = ZebraConnectionStatus.disconnected;
+  ZebraConnectionStatus connectionStatus = ZebraConnectionStatus.disconnected;
 
   static late final StreamSubscription<dynamic> sink;
 
@@ -14,7 +14,7 @@ class ZebraBridge {
 
   static const _eventChannel = EventChannel('dev.fml.zebra123/event');
 
-  List<Zebra123> _listeners = [];
+  final List<Zebra123> listeners = [];
 
   static final ZebraBridge _singleton = ZebraBridge._init();
   factory ZebraBridge() {
@@ -26,22 +26,20 @@ class ZebraBridge {
   }
 
   void addListener(Zebra123 listener) {
-    if (!_listeners.contains(listener)) {
-      _listeners.add(listener);
+    if (!listeners.contains(listener)) {
+      listeners.add(listener);
     }
   }
 
   void removeListener(Zebra123 listener) {
-    if (_listeners.contains(listener)) {
-      _listeners.remove(listener);
+    if (listeners.contains(listener)) {
+      listeners.remove(listener);
     }
   }
 
   void _eventListener(dynamic payload) {
 
     try {
-
-      print(">>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>> _eventListener(dynamic payload)");
 
       final map = Map<String, dynamic>.from(payload);
       interface = toEnum(map['eventSource'] as String, ZebraInterfaces.values) ?? interface;
@@ -54,11 +52,12 @@ class ZebraBridge {
           List<dynamic> tags = map["tags"];
           for (var i = 0; i < tags.length; i++) {
             var tag = Map<String, dynamic>.from(tags[i]);
+            tag["eventSource"] = fromEnum(interface);
             list.add(RfidTag.fromMap(tag));
           }
 
           // notify listeners
-          for (var listener in _listeners) {
+          for (var listener in listeners) {
             listener.callback(interface, event, list);
           }
 
@@ -71,7 +70,7 @@ class ZebraBridge {
           list.add(tag);
 
           // notify listeners
-          for (var listener in _listeners) {
+          for (var listener in listeners) {
             listener.callback(interface, event, list);
           }
 
@@ -82,7 +81,7 @@ class ZebraBridge {
           var error = Error.fromMap(map);
 
           // notify listeners
-          for (var listener in _listeners) {
+          for (var listener in listeners) {
             listener.callback(interface, event, error);
           }
 
@@ -91,14 +90,10 @@ class ZebraBridge {
         case ZebraEvents.connectionStatus:
 
           var connection = ConnectionStatus.fromMap(map);
-          status  = connection.status;
-
-          if (status == ZebraConnectionStatus.disconnected) {
-            //_sink = null;
-          }
+          connectionStatus = connection.status;
 
           // notify listeners
-          for (var listener in _listeners) {
+          for (var listener in listeners) {
             listener.callback(interface, event, connection);
           }
 
