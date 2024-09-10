@@ -83,6 +83,17 @@ public class Zebra123 implements FlutterPlugin, MethodCallHandler, StreamHandler
       case "disconnect":
         break;
 
+      case "scan":
+        if (device != null) {
+          ZebraDevice.ZebraScanRequest request = ZebraDevice.ZebraScanRequest.unknown;
+          try {
+            request = ZebraDevice.ZebraScanRequest.valueOf(call.argument("request").toString());
+          }
+          catch(Exception e) {}
+          device.scan(request);
+        }
+        break;
+
       // not implemented
       default:
         Toast.makeText(context, "Method not implemented: " + method, Toast.LENGTH_LONG).show();

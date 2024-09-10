@@ -42,3 +42,23 @@
 ## 1.0.8
 
 * Modified Interface
+
+## 1.0.9
+
+* Modified Interface
+
+## 1.1.0
+
+* first reasonably stable build
+
+## 1.1.1
+
+* add scan() method to start/stop rfid scanning
+
+## 1.1.2
+
+* git repo fix in pubspec.yaml
+
+## 1.1.3
+
+* git repo fix in pubspec.yaml

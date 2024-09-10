@@ -26,6 +26,7 @@ class Zebra123 {
     _bridge.addListener(this);
   }
 
+  // listen for zebra events
   Future connect() async {
     if (!_bridge.listeners.contains(this)) {
       _bridge.addListener(this);
@@ -33,6 +34,7 @@ class Zebra123 {
     }
   }
 
+  // stop listening to zebra events
   Future disconnect() async {
     if (_bridge.listeners.contains(this)) {
       _bridge.removeListener(this);
@@ -40,6 +42,14 @@ class Zebra123 {
     }
   }
 
+  // start scanning for rfid tags
+  Future scan(ZebraScanRequest request) async {
+    if (_bridge.listeners.contains(this)) {
+      _bridge.scan(request);
+    }
+  }
+
+  // zebra event callback handler
   void callback(ZebraInterfaces interface, ZebraEvents event, dynamic data) {
 
     // only report back changes in connection status on change
@@ -54,11 +64,13 @@ class Zebra123 {
     _callback(interface, event, data);
   }
 
+  // dispose of the zebra plugin
   Future dispose() async {
     disconnect();
   }
 }
 
+/// rfid class holds the rfid tag data
 class RfidTag {
 
   String id;
@@ -84,6 +96,7 @@ class RfidTag {
     required this.interface
   });
 
+  // create a rfid tag from a map
   factory RfidTag.fromMap(Map<String, dynamic> map) {
     return RfidTag(
       id: map['id'] ?? '',
@@ -99,6 +112,7 @@ class RfidTag {
   }
 }
 
+/// barcode class holds the rfid tag data
 class Barcode {
 
   String barcode;
@@ -114,6 +128,7 @@ class Barcode {
     required this.interface
   });
 
+  /// create a barcode from a map
   factory Barcode.fromMap(Map<String, dynamic> map) {
     return Barcode(
       barcode: map['barcode'] ?? '',
@@ -124,6 +139,7 @@ class Barcode {
   }
 }
 
+/// connection status class holds the rfid tag data
 class ConnectionStatus {
 
   ZebraConnectionStatus status = ZebraConnectionStatus.unknown;
@@ -132,12 +148,7 @@ class ConnectionStatus {
     required this.status,
   });
 
-  Map<String, dynamic> toMap() {
-    return {
-      'status': fromEnum(status) ?? ZebraConnectionStatus.unknown,
-    };
-  }
-
+  // create a connection status from a map
   factory ConnectionStatus.fromMap(Map<String, dynamic> map) {
     return ConnectionStatus(
       status: toEnum(map['status'], ZebraConnectionStatus.values) ?? ZebraConnectionStatus.unknown,
@@ -197,6 +208,12 @@ enum Mode {barcode, rfid}
 enum ZebraInterfaces {
   rfidapi3,
   datawedge,
+  unknown
+}
+
+enum ZebraScanRequest {
+  rfidStartInventory,
+  rfidStopInventory,
   unknown
 }
 

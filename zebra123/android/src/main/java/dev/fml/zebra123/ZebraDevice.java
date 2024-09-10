@@ -8,10 +8,18 @@ public interface ZebraDevice {
     public void disconnect();
     public void dispose();
     public void setMode(String mode);
+    public void scan(ZebraScanRequest request);
 
     enum ZebraInterfaces {
         rfidapi3,
         datawedge,
+        unknown
+    }
+
+
+    enum ZebraScanRequest {
+        rfidStartInventory,
+        rfidStopInventory,
         unknown
     }
 

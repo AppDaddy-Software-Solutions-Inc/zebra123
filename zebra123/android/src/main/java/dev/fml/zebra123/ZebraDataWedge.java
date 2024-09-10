@@ -163,6 +163,17 @@ public final class ZebraDataWedge extends BroadcastReceiver implements ZebraDevi
     }
 
     @Override
+    public void scan(ZebraScanRequest request) {
+
+        if (request == ZebraScanRequest.rfidStartInventory) {
+            //startInventory();
+        }
+        else if (request == ZebraScanRequest.rfidStopInventory) {
+            //stopInventory();
+        }
+    }
+
+    @Override
     public void setMode(String mode) {
 
     }

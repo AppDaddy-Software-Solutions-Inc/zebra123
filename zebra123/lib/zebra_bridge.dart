@@ -3,6 +3,8 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 import 'package:zebra123/zebra123.dart';
 
+
+/// bridge between flutter and android.
 class ZebraBridge {
 
   ZebraInterfaces interface = ZebraInterfaces.unknown;
@@ -17,6 +19,8 @@ class ZebraBridge {
   final List<Zebra123> listeners = [];
 
   static final ZebraBridge _singleton = ZebraBridge._init();
+
+  // creates a bridge instance
   factory ZebraBridge() {
     return _singleton;
   }
@@ -25,18 +29,26 @@ class ZebraBridge {
     _methodChannel.invokeMethod("connect", {"hashCode": hashCode});
   }
 
+  // listen for zebra events
   void addListener(Zebra123 listener) {
     if (!listeners.contains(listener)) {
       listeners.add(listener);
     }
   }
 
+  // stop listening to zebra events
   void removeListener(Zebra123 listener) {
     if (listeners.contains(listener)) {
       listeners.remove(listener);
     }
   }
 
+  // invoke scan request
+  void scan(ZebraScanRequest request) {
+    _methodChannel.invokeMethod("scan", {"request": fromEnum(request)});
+  }
+
+  // zebra events listener
   void _eventListener(dynamic payload) {
 
     try {

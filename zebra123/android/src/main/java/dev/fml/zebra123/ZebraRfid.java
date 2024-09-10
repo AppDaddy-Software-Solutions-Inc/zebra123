@@ -73,6 +73,40 @@ public class ZebraRfid implements ZebraDevice, RfidEventsListener {
         return false;
     }
 
+    private synchronized void ConfigureReader() {
+        if (isReaderConnected()) {
+
+            try {
+
+                Log.d(TAG, "ConfigureReader()");
+
+                // receive events from reader
+                setEvents();
+
+                // set read mode
+                setMode(ENUM_TRIGGER_MODE.RFID_MODE);
+
+                // set start and stop triggers
+                setTriggers(START_TRIGGER_TYPE.START_TRIGGER_TYPE_IMMEDIATE, STOP_TRIGGER_TYPE.STOP_TRIGGER_TYPE_IMMEDIATE);
+
+                // power levels are index based so maximum power supported get the last one
+                int powerLevel =  reader.ReaderCapabilities.getTransmitPowerLevelValues().length - 1;
+                setPowerLevel(powerLevel);
+
+                reader.Config.setBeeperVolume(BEEPER_VOLUME.HIGH_BEEP);
+
+                // Set the singulation control
+                setAntennaConfig();
+
+                // delete any prefilters
+                reader.Actions.PreFilters.deleteAll();
+
+            } catch (InvalidUsageException | OperationFailureException e) {
+                e.printStackTrace();
+            }
+        }
+    }
+
     private void setRegulatoryConfig() {
 
         try {
@@ -115,7 +149,7 @@ public class ZebraRfid implements ZebraDevice, RfidEventsListener {
                 reader.Events.addEventsListener(this);
                 reader.Events.setHandheldEvent(true);
                 reader.Events.setTagReadEvent(true);
-                reader.Events.setAttachTagDataWithReadEvent(false);
+                reader.Events.setAttachTagDataWithReadEvent(true);
 
                 // this will make the led's flash when a tag is read and while the trigger is held down
                 reader.Config.setUniqueTagReport(false);
@@ -261,6 +295,17 @@ public class ZebraRfid implements ZebraDevice, RfidEventsListener {
     }
 
     @Override
+    public void scan(ZebraScanRequest request) {
+
+        if (request == ZebraScanRequest.rfidStartInventory) {
+            startInventory();
+        }
+        else if (request == ZebraScanRequest.rfidStopInventory) {
+            stopInventory();
+        }
+    }
+
+    @Override
     public void dispose() {
         //listener = null;
     }
@@ -276,65 +321,30 @@ public class ZebraRfid implements ZebraDevice, RfidEventsListener {
         }
     }
 
-    private synchronized void ConfigureReader() {
-        if (isReaderConnected()) {
+    @Override
+    public void eventReadNotify(RfidReadEvents event) {
 
-            try {
+        try {
+            TagData tag = event.getReadEventData().tagData;
+            if(tag.getOpCode() == null || tag.getOpCode()== ACCESS_OPERATION_CODE.ACCESS_OPERATION_READ) {
 
-                Log.d(TAG, "ConfigureReader()");
+                TagInfo data = new TagInfo();
+                data.id = tag.getTagID();
+                data.antenna = tag.getAntennaID();
+                data.rssi = tag.getPeakRSSI();
+                data.status = tag.getOpStatus();
+                data.size = tag.getTagIDAllocatedSize();
+                data.lockData = tag.getPermaLockData();
+                if (tag.isContainsLocationInfo()) {
+                    data.distance = tag.LocationInfo.getRelativeDistance();
+                }
+                data.memoryBankData = tag.getMemoryBankData();
 
-                // receive events from reader
-                setEvents();
-
-                // set read mode
-                setMode(ENUM_TRIGGER_MODE.RFID_MODE);
-
-                // set start and stop triggers
-                setTriggers(START_TRIGGER_TYPE.START_TRIGGER_TYPE_IMMEDIATE, STOP_TRIGGER_TYPE.STOP_TRIGGER_TYPE_IMMEDIATE);
-
-                // power levels are index based so maximum power supported get the last one
-                int powerLevel =  reader.ReaderCapabilities.getTransmitPowerLevelValues().length - 1;
-                setPowerLevel(powerLevel);
-
-                reader.Config.setBeeperVolume(BEEPER_VOLUME.HIGH_BEEP);
-
-                // Set the singulation control
-                setAntennaConfig();
-
-                // delete any prefilters
-                reader.Actions.PreFilters.deleteAll();
-
-            } catch (InvalidUsageException | OperationFailureException e) {
-                e.printStackTrace();
+                tags.put(data.id, data);
             }
         }
-    }
-
-    @Override
-    public void eventReadNotify(RfidReadEvents rfidReadEvents) {
-
-        // Recommended to use new method getReadTagsEx for better performance in case of large tag population
-        TagData[] myTags = reader.Actions.getReadTags(100);
-        if (myTags != null) {
-            for (int index = 0; index < myTags.length; index++) {
-                TagData tagData=myTags[index];
-                ///read operation
-                if(tagData.getOpCode()==null || tagData.getOpCode()== ACCESS_OPERATION_CODE.ACCESS_OPERATION_READ){
-                    //&&tagData.getOpStatus()== ACCESS_OPERATION_STATUS.ACCESS_SUCCESS
-                    TagInfo data=new TagInfo();
-                    data.id=tagData.getTagID();
-                    data.antenna=tagData.getAntennaID();
-                    data.rssi =tagData.getPeakRSSI();
-                    data.status =tagData.getOpStatus();
-                    data.size=tagData.getTagIDAllocatedSize();
-                    data.lockData=tagData.getPermaLockData();
-                    if(tagData.isContainsLocationInfo()){
-                        data.distance = tagData.LocationInfo.getRelativeDistance();
-                    }
-                    data.memoryBankData=tagData.getMemoryBankData();
-                    tags.put(data.id, data);
-                }
-            }
+        catch (Exception e) {
+            Log.e(TAG, "Error reading tag data. Error is " + e.toString());
         }
     }
 
