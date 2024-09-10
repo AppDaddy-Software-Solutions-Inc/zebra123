@@ -3,10 +3,8 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 import 'package:zebra123/zebra123.dart';
 
-
 /// bridge between flutter and android.
 class ZebraBridge {
-
   ZebraInterfaces interface = ZebraInterfaces.unknown;
   ZebraConnectionStatus connectionStatus = ZebraConnectionStatus.disconnected;
 
@@ -50,15 +48,15 @@ class ZebraBridge {
 
   // zebra events listener
   void _eventListener(dynamic payload) {
-
     try {
-
       final map = Map<String, dynamic>.from(payload);
-      interface = toEnum(map['eventSource'] as String, ZebraInterfaces.values) ?? interface;
-      final event = toEnum(map['eventName'] as String, ZebraEvents.values) ?? ZebraEvents.unknown;
+      interface =
+          toEnum(map['eventSource'] as String, ZebraInterfaces.values) ??
+              interface;
+      final event = toEnum(map['eventName'] as String, ZebraEvents.values) ??
+          ZebraEvents.unknown;
 
       switch (event) {
-
         case ZebraEvents.readRfid:
           List<RfidTag> list = [];
           List<dynamic> tags = map["tags"];
@@ -76,7 +74,6 @@ class ZebraBridge {
           break;
 
         case ZebraEvents.readBarcode:
-
           List<Barcode> list = [];
           var tag = Barcode.fromMap(map);
           list.add(tag);
@@ -89,7 +86,6 @@ class ZebraBridge {
           break;
 
         case ZebraEvents.error:
-
           var error = Error.fromMap(map);
 
           // notify listeners
@@ -100,7 +96,6 @@ class ZebraBridge {
           break;
 
         case ZebraEvents.connectionStatus:
-
           var connection = ConnectionStatus.fromMap(map);
           connectionStatus = connection.status;
 
@@ -114,8 +109,7 @@ class ZebraBridge {
         default:
           break;
       }
-    }
-    catch (e) {
+    } catch (e) {
       if (kDebugMode) print(e);
     }
   }
