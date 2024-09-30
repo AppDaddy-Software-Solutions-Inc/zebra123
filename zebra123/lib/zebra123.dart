@@ -255,7 +255,11 @@ bool? toBool(dynamic s) {
 
 enum Mode { barcode, rfid }
 
-enum ZebraInterfaces { rfidapi3, datawedge, unknown }
+enum ZebraInterfaces {
+  rfidapi3,
+  datawedge,
+  unknown
+}
 
 enum ZebraScanRequest {
   rfidStartScanning,
@@ -279,4 +283,9 @@ enum ZebraEvents {
   unknown
 }
 
-enum ZebraConnectionStatus { disconnected, connected, error, unknown }
+enum ZebraConnectionStatus {
+  disconnected,
+  connected,
+  error,
+  unknown
+}

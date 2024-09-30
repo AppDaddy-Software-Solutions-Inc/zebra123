@@ -18,6 +18,12 @@ public interface ZebraDevice {
         unknown
     }
 
+    enum Methods {
+        track,
+        scan,
+        write,
+        unknown
+    }
 
     enum ZebraScanRequest {
         rfidStartScanning,
@@ -30,13 +36,13 @@ public interface ZebraDevice {
     enum ZebraEvents {
         readRfid,
         readBarcode,
+        error,
+        connectionStatus,
+        support,
         startRead,
         stopRead,
         writeFail,
         writeSuccess,
-        error,
-        connectionStatus,
-        support,
         unknown
     }
 

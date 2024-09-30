@@ -21,7 +21,6 @@ class ZebraBridge {
       addListener(listener);
     }
     _sink = _eventChannel.receiveBroadcastStream().listen(_eventListener);
-    _methodChannel.invokeMethod("connect", {"hashCode": hashCode});
   }
 
   // listen for zebra events

@@ -65,11 +65,11 @@ public class Zebra123 implements FlutterPlugin, MethodCallHandler, StreamHandler
   @Override
   public void onMethodCall(@NonNull MethodCall call, @NonNull Result result) {
 
-    String method = call.method;
+    ZebraDevice.Methods method = toEnumerable(call.method.toString(), ZebraDevice.Methods);
 
     switch (method) {
 
-      case "track":
+      case ZebraMethods.track:
         if (device != null) {
           ZebraDevice.ZebraScanRequest request = ZebraDevice.ZebraScanRequest.unknown;
           ArrayList<String> list = new ArrayList<>();
@@ -83,7 +83,7 @@ public class Zebra123 implements FlutterPlugin, MethodCallHandler, StreamHandler
         }
         break;
 
-      case "scan":
+      case ZebraMethods.scan:
         if (device != null) {
           ZebraDevice.ZebraScanRequest request = ZebraDevice.ZebraScanRequest.unknown;
           try {
@@ -94,7 +94,7 @@ public class Zebra123 implements FlutterPlugin, MethodCallHandler, StreamHandler
         }
         break;
 
-      case "write":
+      case ZebraMethods.write:
         if (device != null) {
           String epc         = argument(call,"epc");
           String newEpc      = argument(call,"epcNew");
@@ -107,7 +107,7 @@ public class Zebra123 implements FlutterPlugin, MethodCallHandler, StreamHandler
 
       // not implemented
       default:
-        Toast.makeText(context, "Method not implemented: " + method, Toast.LENGTH_LONG).show();
+        Toast.makeText(context, "Method " + call.method + " not implemented", Toast.LENGTH_LONG).show();
     }
 
     result.success(null);

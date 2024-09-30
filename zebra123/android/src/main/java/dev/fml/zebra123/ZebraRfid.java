@@ -664,7 +664,7 @@ public class ZebraRfid implements ZebraDevice, RfidEventsListener {
             if (exception != null) {
                 ok = false;
                 Log.e(TAG, "Error writing tag password: " + exception.getMessage());
-                sendEvent(ZebraEvents.writeFail, ZebraDevice.toError("Error writing tag password", exception));
+                notify(ZebraEvents.writeFail, ZebraDevice.toError("Error writing tag password", exception));
             }
             else password = newPassword;
         }
