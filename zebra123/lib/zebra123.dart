@@ -13,7 +13,7 @@ class Zebra123 {
   ZebraConnectionStatus _connectionStatus = ZebraConnectionStatus.unknown;
   ZebraConnectionStatus get connectionStatus {
     // if listening return zebra bridge connection status
-    if (_bridge.listeners.contains(this)) return _bridge.connectionStatus;
+    if (ZebraBridge.listeners.contains(this)) return _bridge.connectionStatus;
 
     // otherwise return disconnected
     return ZebraConnectionStatus.disconnected;
@@ -21,13 +21,16 @@ class Zebra123 {
 
   Zebra123({required callback}) {
     _callback = callback;
-    _bridge = ZebraBridge();
-    _bridge.addListener(this);
+    _bridge = ZebraBridge(listener: this);
   }
+
+  // supports the zebra specified interface?
+  bool supports(ZebraInterfaces interface) =>
+      ZebraBridge.support.contains(interface);
 
   // listen for zebra events
   Future connect() async {
-    if (!_bridge.listeners.contains(this)) {
+    if (!ZebraBridge.listeners.contains(this)) {
       _bridge.addListener(this);
       _callback(_bridge.interface, ZebraEvents.connectionStatus,
           ConnectionStatus(status: connectionStatus));
@@ -36,7 +39,7 @@ class Zebra123 {
 
   // stop listening to zebra events
   Future disconnect() async {
-    if (_bridge.listeners.contains(this)) {
+    if (ZebraBridge.listeners.contains(this)) {
       _bridge.removeListener(this);
       _callback(_bridge.interface, ZebraEvents.connectionStatus,
           ConnectionStatus(status: ZebraConnectionStatus.disconnected));
@@ -44,10 +47,44 @@ class Zebra123 {
   }
 
   // start scanning for rfid tags
-  Future scan(ZebraScanRequest request) async {
-    if (_bridge.listeners.contains(this)) {
-      _bridge.scan(request);
+  Future startScanning() async {
+    if (ZebraBridge.listeners.contains(this)) {
+      _bridge.scan(ZebraScanRequest.rfidStartScanning);
     }
+  }
+
+  // stop scanning for rfid tags
+  Future stopScanning() async {
+    if (ZebraBridge.listeners.contains(this)) {
+      _bridge.scan(ZebraScanRequest.rfidStopScanning);
+    }
+  }
+
+  // start rfid tag tracking
+  Future startTracking(List<String> tags) async {
+    if (ZebraBridge.listeners.contains(this)) {
+      _bridge.track(ZebraScanRequest.rfidStartTracking, tags: tags);
+    }
+  }
+
+  // stop rfid tag tracking
+  Future stopTracking() async {
+    if (ZebraBridge.listeners.contains(this)) {
+      _bridge.track(ZebraScanRequest.rfidStopTracking);
+    }
+  }
+
+  // write rfid tag
+  Future writeTag(String epc,
+      {String? epcNew,
+      double? password,
+      double? passwordNew,
+      String? data}) async {
+    _bridge.write(epc,
+        epcNew: epcNew,
+        password: password,
+        passwordNew: passwordNew,
+        data: data);
   }
 
   // zebra event callback handler
@@ -60,7 +97,6 @@ class Zebra123 {
       }
       return;
     }
-
     _callback(interface, event, data);
   }
 
@@ -72,7 +108,7 @@ class Zebra123 {
 
 /// rfid class holds the rfid tag data
 class RfidTag {
-  String id;
+  String epc;
   int antenna;
   int rssi;
   int distance;
@@ -80,10 +116,16 @@ class RfidTag {
   String lockData;
   int size;
   String seen;
+
+  // required for write operation
+  String? epcNew;
+  String? password;
+  String? passwordNew;
+
   ZebraInterfaces interface;
 
   RfidTag(
-      {required this.id,
+      {required this.epc,
       required this.antenna,
       required this.rssi,
       required this.distance,
@@ -96,7 +138,7 @@ class RfidTag {
   // create a rfid tag from a map
   factory RfidTag.fromMap(Map<String, dynamic> map) {
     return RfidTag(
-      id: map['id'] ?? '',
+      epc: map['epc'] ?? '',
       antenna: map['antenna']?.toInt() ?? 0,
       rssi: map['rssi']?.toInt() ?? 0,
       distance: map['distance']?.toInt() ?? 0,
@@ -104,7 +146,7 @@ class RfidTag {
       lockData: map['lockData'] ?? '',
       size: map['size']?.toInt() ?? 0,
       seen: map['seen'] ?? '',
-      interface: toEnum(map['eventSource'], ZebraInterfaces.values) ??
+      interface: toEnumerable(map['eventSource'], ZebraInterfaces.values) ??
           ZebraInterfaces.unknown,
     );
   }
@@ -129,7 +171,7 @@ class Barcode {
       barcode: map['barcode'] ?? '',
       format: map['format'] ?? '',
       seen: map['seen'] ?? '',
-      interface: toEnum(map['eventSource'], ZebraInterfaces.values) ??
+      interface: toEnumerable(map['eventSource'], ZebraInterfaces.values) ??
           ZebraInterfaces.unknown,
     );
   }
@@ -146,7 +188,7 @@ class ConnectionStatus {
   // create a connection status from a map
   factory ConnectionStatus.fromMap(Map<String, dynamic> map) {
     return ConnectionStatus(
-      status: toEnum(map['status'], ZebraConnectionStatus.values) ??
+      status: toEnumerable(map['status'], ZebraConnectionStatus.values) ??
           ZebraConnectionStatus.unknown,
     );
   }
@@ -181,7 +223,7 @@ class Error {
 }
 
 /// Returns a String name given an Enum Type
-String? fromEnum(Object? e) {
+String? fromEnumerable(Object? e) {
   try {
     return e.toString().split('.').last;
   } catch (e) {
@@ -190,9 +232,22 @@ String? fromEnum(Object? e) {
 }
 
 /// Returns an Enum Type given a String name
-T? toEnum<T>(String? key, List<T> values) {
+T? toEnumerable<T>(String? key, List<T> values) {
   try {
-    return values.firstWhereOrNull((v) => key == fromEnum(v));
+    return values.firstWhereOrNull((v) => key == fromEnumerable(v));
+  } catch (e) {
+    return null;
+  }
+}
+
+bool? toBool(dynamic s) {
+  try {
+    if (s == null) return null;
+    if (s is bool) return s;
+    s = s.toString().trim().toLowerCase();
+    if (s == "true") return true;
+    if (s == "false") return false;
+    return null;
   } catch (e) {
     return null;
   }
@@ -202,8 +257,26 @@ enum Mode { barcode, rfid }
 
 enum ZebraInterfaces { rfidapi3, datawedge, unknown }
 
-enum ZebraScanRequest { rfidStartInventory, rfidStopInventory, unknown }
+enum ZebraScanRequest {
+  rfidStartScanning,
+  rfidStopScanning,
+  rfidStartTracking,
+  rfidStopTracking,
+  write,
+  unknown
+}
 
-enum ZebraEvents { readRfid, readBarcode, error, connectionStatus, unknown }
+enum ZebraEvents {
+  readRfid,
+  readBarcode,
+  error,
+  connectionStatus,
+  support,
+  startRead,
+  stopRead,
+  writeFail,
+  writeSuccess,
+  unknown
+}
 
 enum ZebraConnectionStatus { disconnected, connected, error, unknown }

@@ -13,19 +13,23 @@ import org.jetbrains.annotations.NotNull;
 
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
-import java.util.Calendar;
 import java.util.Date;
 import java.util.HashMap;
 
-public final class ZebraDataWedge extends BroadcastReceiver implements ZebraDevice {
+import io.flutter.plugin.common.EventChannel.StreamHandler;
+import io.flutter.plugin.common.EventChannel.EventSink;
+
+public class ZebraDataWedge extends BroadcastReceiver implements ZebraDevice {
 
     private static final String TAG = "zebra123";
 
     private static final ZebraInterfaces INTERFACE = ZebraInterfaces.datawedge;
 
-
     private Context context;
-    ZebraDeviceListener listener;
+    private EventSink sink = null;
+
+    public static String barcodeLast = "";
+    public static long seenLast = 0;
 
     public static final String PROFILE_INTENT_ACTION = TAG;
     public static final String PROFILE_INTENT_BROADCAST = "2";
@@ -40,11 +44,10 @@ public final class ZebraDataWedge extends BroadcastReceiver implements ZebraDevi
     public static final String DATAWEDGE_SEND_SET_CONFIG = "com.symbol.datawedge.api.SET_CONFIG";
     public static final String DATAWEDGE_SEND_SCANNER_COMMAND = "com.symbol.datawedge.api.SCANNER_INPUT_PLUGIN";
 
-    public ZebraDataWedge(Context context, ZebraDeviceListener listener) {
+    public ZebraDataWedge(Context context, EventSink sink) {
 
         this.context = context;
-        this.listener = listener;
-
+        this.sink = sink;
         this.createProfile();
     }
 
@@ -64,36 +67,42 @@ public final class ZebraDataWedge extends BroadcastReceiver implements ZebraDevi
         }
         return false;
     }
+
     @Override
     public void onReceive(Context context, Intent intent) {
         String action = intent.getAction();
         if (action.equals(TAG)) {
-
             try {
-                String data   = intent.getStringExtra("com.symbol.datawedge.data_string");
-                String format = intent.getStringExtra("com.symbol.datawedge.label_type");
-                Date datetime = Calendar.getInstance().getTime();
-                String date   = new SimpleDateFormat("dd/MM/yyyy HH:mm:ss.SSS").format(datetime).toString();
+                String barcode = intent.getStringExtra("com.symbol.datawedge.data_string");
+                String format  = intent.getStringExtra("com.symbol.datawedge.label_type");
+                long   seen    = System.currentTimeMillis();
+                String date    = new SimpleDateFormat("dd/MM/yyyy HH:mm:ss.SSS").format(new Date(seen)).toString();
 
                 // create a map of simple objects
                 HashMap<String, Object> tag = new HashMap<>();
-                tag.put("barcode", data);
+                tag.put("barcode", barcode);
                 tag.put("format", format);
                 tag.put("seen", date);
 
+                // duplicate reads within 1 second are ignored
+                if (barcode.equals(barcodeLast) && Math.abs(seen - seenLast) < 1000) {
+                    Log.e(TAG, "Duplicate barcode read within 1 second. Skipping.");
+                    return;
+                }
+                barcodeLast = barcode;
+                seenLast = seen;
+
                 // notify listener
                 Log.d(TAG, ZebraEvents.readBarcode + ": " + tag);
-                if (listener != null) {
-                    listener.notify(INTERFACE, ZebraEvents.readBarcode, tag);
-                }
+
+                sendEvent(ZebraEvents.readBarcode, tag);
             }
             catch(Exception e) {
                 Log.e(TAG, "Error deserializing json object" + e.getMessage());
-                if (listener != null) listener.notify(INTERFACE, ZebraEvents.error, ZebraDevice.toError("onReceive()", e));
-            }{}
+                sendEvent(ZebraEvents.error, ZebraDevice.toError("onReceive()", e));
+            }
         }
     }
-
 
     private void sendCommandString(@NotNull String command, @NotNull String parameter, boolean sendResult) {
         Intent dwIntent = new Intent();
@@ -118,21 +127,23 @@ public final class ZebraDataWedge extends BroadcastReceiver implements ZebraDevi
         try {
 
             final IntentFilter filter = new IntentFilter();
+            filter.addAction("com.symbol.datawedge.api.RESULT_ACTION");
+            filter.addAction("com.symbol.datawedge.api.ACTION");
+            filter.addAction("com.symbol.datawedge.api.NOTIFICATION_ACTION");
             filter.addCategory(Intent.CATEGORY_DEFAULT);
             filter.addAction(TAG); // Please use this String in your DataWedge profile configuration
+
             context.registerReceiver(this, filter);
 
             HashMap<String, Object> map =new HashMap<>();
             map.put("status", ZebraConnectionStatus.connected.toString());
 
             // notify device
-            if (listener != null) {
-                listener.notify(INTERFACE, ZebraEvents.connectionStatus,map);
-            }
+            sendEvent(ZebraEvents.connectionStatus,map);
         }
         catch(Exception e) {
             Log.e(TAG, "Error connecting to device" + e.getMessage());
-            if (listener != null) listener.notify(INTERFACE, ZebraEvents.error, ZebraDevice.toError("connect()", e));
+            sendEvent(ZebraEvents.error, ZebraDevice.toError("connect()", e));
         }
     }
 
@@ -146,36 +157,44 @@ public final class ZebraDataWedge extends BroadcastReceiver implements ZebraDevi
             map.put("status", ZebraConnectionStatus.disconnected.toString());
 
             // notify device
-            if (listener != null) {
-                listener.notify(INTERFACE, ZebraEvents.connectionStatus,map);
-            }
+            sendEvent(ZebraEvents.connectionStatus,map);
         }
         catch(Exception e) {
             Log.e(TAG, "Error disconnecting from device" + e.getMessage());
-            if (listener != null) listener.notify(INTERFACE, ZebraEvents.error, ZebraDevice.toError("disconnect()", e));
+            sendEvent(ZebraEvents.error, ZebraDevice.toError("disconnect()", e));
         }
     }
 
     @Override
     public void dispose() {
-        listener = null;
         context.unregisterReceiver(this);
     }
 
     @Override
     public void scan(ZebraScanRequest request) {
-
-        if (request == ZebraScanRequest.rfidStartInventory) {
-            //startInventory();
-        }
-        else if (request == ZebraScanRequest.rfidStopInventory) {
-            //stopInventory();
-        }
+        Exception exception = new Exception("Not implemented");
+        sendEvent(ZebraEvents.error, ZebraDevice.toError("Error writing tag data", exception));
+        return;
     }
 
     @Override
-    public void setMode(String mode) {
+    public void track(ZebraScanRequest request, ArrayList<String> tags) {
+        Exception exception = new Exception("Not implemented");
+        sendEvent(ZebraEvents.error, ZebraDevice.toError("Error calling track()", exception));
+        return;
+    }
 
+    @Override
+    public void write(String epc, String newEpc, String password, String newPassword, String data) {
+        Exception exception = new Exception("Not implemented");
+        sendEvent(ZebraEvents.error, ZebraDevice.toError("Error calling write()", exception));
+        return;
+    }
+
+    public void setMode(String mode) {
+        Exception exception = new Exception("Not implemented");
+        sendEvent(ZebraEvents.error, ZebraDevice.toError("Error calling setMode()", exception));
+        return;
     }
 
     private void createProfile() {
@@ -254,5 +273,20 @@ public final class ZebraDataWedge extends BroadcastReceiver implements ZebraDevi
         this.sendCommandBundle("com.symbol.datawedge.api.SET_CONFIG", dwProfile);
 
         sendCommandString("com.symbol.datawedge.api.SCANNER_INPUT_PLUGIN", "ENABLE_PLUGIN", false);
+    }
+
+    private void sendEvent(final ZebraDevice.ZebraEvents event, final HashMap map) {
+
+        if (sink == null) Log.e(TAG, "Can't send notification to flutter. Sink is null");
+        try
+        {
+            map.put("eventSource", INTERFACE.toString());
+            map.put("eventName", event.toString());
+            sink.success(map);
+        }
+        catch (Exception e)
+        {
+            Log.e(TAG, "Error sending notification to flutter. Error: " + e.getMessage());
+        }
     }
 }

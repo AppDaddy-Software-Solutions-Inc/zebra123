@@ -163,8 +163,29 @@ public final class ZebraDataWedge extends BroadcastReceiver implements ZebraDevi
     }
 
     @Override
+    public void scan(ZebraScanRequest request) {
+        Exception exception = new Exception("Not implemented");
+        if (listener != null) listener.notify(INTERFACE, ZebraEvents.writeFail, ZebraDevice.toError("Error writing tag data", exception));
+        return;
+    }
+
+    @Override
+    public void track(ZebraScanRequest request, ArrayList<String> tags) {
+        Exception exception = new Exception("Not implemented");
+        if (listener != null) listener.notify(INTERFACE, ZebraEvents.writeFail, ZebraDevice.toError("Error writing tag data", exception));
+        return;
+    }
+
+    @Override
     public void setMode(String mode) {
 
+    }
+
+    @Override
+    public void write(String epc, String newEpc, String password, String newPassword, String data) {
+        Exception exception = new Exception("Not implemented");
+        if (listener != null) listener.notify(INTERFACE, ZebraEvents.writeFail, ZebraDevice.toError("Error writing tag data", exception));
+        return;
     }
 
     private void createProfile() {

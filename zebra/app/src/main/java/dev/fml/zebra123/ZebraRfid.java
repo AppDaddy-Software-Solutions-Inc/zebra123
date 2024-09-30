@@ -10,11 +10,13 @@ import com.zebra.rfid.api3.ACCESS_OPERATION_STATUS;
 import com.zebra.rfid.api3.Antennas;
 import com.zebra.rfid.api3.BATCH_MODE;
 import com.zebra.rfid.api3.BEEPER_VOLUME;
+import com.zebra.rfid.api3.DYNAMIC_POWER_OPTIMIZATION;
 import com.zebra.rfid.api3.ENUM_TRANSPORT;
 import com.zebra.rfid.api3.ENUM_TRIGGER_MODE;
 import com.zebra.rfid.api3.HANDHELD_TRIGGER_EVENT_TYPE;
 import com.zebra.rfid.api3.INVENTORY_STATE;
 import com.zebra.rfid.api3.InvalidUsageException;
+import com.zebra.rfid.api3.MEMORY_BANK;
 import com.zebra.rfid.api3.OperationFailureException;
 import com.zebra.rfid.api3.RFIDReader;
 import com.zebra.rfid.api3.ReaderDevice;
@@ -29,6 +31,7 @@ import com.zebra.rfid.api3.SL_FLAG;
 import com.zebra.rfid.api3.START_TRIGGER_TYPE;
 import com.zebra.rfid.api3.STATUS_EVENT_TYPE;
 import com.zebra.rfid.api3.STOP_TRIGGER_TYPE;
+import com.zebra.rfid.api3.TagAccess;
 import com.zebra.rfid.api3.TagData;
 import com.zebra.rfid.api3.TriggerInfo;
 
@@ -51,7 +54,11 @@ public class ZebraRfid implements ZebraDevice, RfidEventsListener {
 
     private RFIDReader reader;
 
+    // holds a list of tags read
     private HashMap<String, TagInfo> tags = new HashMap<>();
+
+    // holds a list of epc's to track
+    private ArrayList<String> tracking = new ArrayList<>();
 
     ZebraDeviceListener listener;
 
@@ -294,6 +301,28 @@ public class ZebraRfid implements ZebraDevice, RfidEventsListener {
     }
 
     @Override
+    public void scan(ZebraScanRequest request) {
+
+        if (request == ZebraScanRequest.rfidStartScanning) {
+            startScanning();
+        }
+        else if (request == ZebraScanRequest.rfidStopScanning) {
+            stopScanning();
+        }
+    }
+
+    public void track(ZebraScanRequest request, ArrayList<String> tags) {
+
+        if (request == ZebraScanRequest.rfidStartTracking) {
+            startTracking(tags);
+        }
+        else if (request == ZebraScanRequest.rfidStopTracking) {
+            stopTracking();
+        }
+    }
+
+
+    @Override
     public void dispose() {
         //listener = null;
     }
@@ -317,7 +346,7 @@ public class ZebraRfid implements ZebraDevice, RfidEventsListener {
             if(tag.getOpCode() == null || tag.getOpCode()== ACCESS_OPERATION_CODE.ACCESS_OPERATION_READ) {
 
                 TagInfo data = new TagInfo();
-                data.id = tag.getTagID();
+                data.epc = tag.getTagID();
                 data.antenna = tag.getAntennaID();
                 data.rssi = tag.getPeakRSSI();
                 data.status = tag.getOpStatus();
@@ -328,7 +357,18 @@ public class ZebraRfid implements ZebraDevice, RfidEventsListener {
                 }
                 data.memoryBankData = tag.getMemoryBankData();
 
-                tags.put(data.id, data);
+                // tracking enabled?
+                if (tracking.size() > 0) {
+                    if (tracking.contains(data.epc)) {
+                        boolean notify = true;
+                        if (tags.containsKey(data.epc) && tags.get(data.epc).rssi == data.rssi) notify = false;
+                        tags.put(data.epc, data);
+                        if (notify) reportTags();
+                    }
+                }
+                else {
+                    tags.put(data.epc, data);
+                }
             }
         }
         catch (Exception e) {
@@ -360,7 +400,7 @@ public class ZebraRfid implements ZebraDevice, RfidEventsListener {
 
                     @Override
                     public void doInBackground() {
-                        startInventory();
+                        startScanning();
                     }
 
                     @Override
@@ -384,7 +424,7 @@ public class ZebraRfid implements ZebraDevice, RfidEventsListener {
 
                     @Override
                     public void doInBackground() {
-                        stopInventory();
+                        stopScanning();
                     }
 
                     @Override
@@ -397,12 +437,45 @@ public class ZebraRfid implements ZebraDevice, RfidEventsListener {
         }
     }
 
-    synchronized void startInventory() {
+    synchronized void reportTags() {
+        try
+        {
+            if (tags.size() > 0) {
+
+                ArrayList<HashMap<String, Object>> data = new ArrayList<>();
+                for (TagInfo tag : tags.values())
+                    data.add(transitionEntity(tag));
+                tags.clear();
+
+                HashMap<String,Object> hashMap=new HashMap<>();
+                hashMap.put("tags",data);
+
+                // notify listener
+                if (listener != null) {
+                    listener.notify(INTERFACE, ZebraEvents.readRfid,hashMap);
+                }
+            }
+        }
+        catch (Exception e) {
+            Log.e(TAG, ">>>>>>>>>>>>>>>>>>>> Error in reportTags()");
+        }
+    }
+
+    synchronized void startScanning() {
 
         try
         {
+            // clear tracking filter
+            tracking.clear();
+
             if (reader != null) {
-                Log.d(TAG, "STARTING INVENTORY");
+                Log.d(TAG, "START SCANNNING");
+
+                // notify listener
+                if (listener != null) {
+                    listener.notify(INTERFACE, ZebraEvents.startRead,new HashMap<>());
+                }
+
                 reader.Actions.Inventory.stop();
                 reader.Actions.Inventory.perform();
             }
@@ -410,38 +483,247 @@ public class ZebraRfid implements ZebraDevice, RfidEventsListener {
         catch (Exception e)
         {
             Log.e(TAG, ">>>>>>>>>>>>>>>> Error in startInventory()");
-            stopInventory();
+            stopScanning();
         }
     }
 
-    synchronized void stopInventory() {
+    synchronized void stopScanning() {
+
         // check reader connection
         if (!isReaderConnected()) return;
 
         try
         {
             if (reader != null) {
-                Log.d(TAG, "STOPPING INVENTORY. Found " + tags.size() + " tags");
-                reader.Actions.Inventory.stop();
-                if (tags.size() > 0) {
+                Log.d(TAG, "STOP SCANNING. Found " + tags.size() + " tags");
 
-                    ArrayList<HashMap<String, Object>> data = new ArrayList<>();
-                    for (TagInfo tag : tags.values())
-                        data.add(transitionEntity(tag));
-                    tags.clear();
-
-                    HashMap<String,Object> hashMap=new HashMap<>();
-                    hashMap.put("tags",data);
-
-                    // notify listener
-                    if (listener != null) {
-                        listener.notify(INTERFACE, ZebraEvents.readRfid,hashMap);
-                    }
+                // notify listener
+                if (listener != null) {
+                    listener.notify(INTERFACE, ZebraEvents.stopRead,new HashMap<>());
                 }
+
+                // stop the reader
+                reader.Actions.Inventory.stop();
+
+                // report tags
+                reportTags();
             }
         }
         catch (Exception e) {
             Log.e(TAG, ">>>>>>>>>>>>>>>>>>>> Error in stopInventory()");
+        }
+    }
+
+    synchronized void startTracking(ArrayList<String> tags) {
+
+        try
+        {
+            // clear tracking
+            tracking.clear();
+
+            if (reader != null) {
+                Log.d(TAG, "STARTING TRACKING");
+
+                // notify listener
+                if (listener != null) {
+                    listener.notify(INTERFACE, ZebraEvents.startRead,new HashMap<>());
+                }
+
+                // set tracking tags
+                tracking.addAll(tags);
+
+                // stop read
+                reader.Actions.Inventory.stop();
+
+                // start inventory
+                reader.Actions.Inventory.perform();
+            }
+        }
+        catch (Exception e)
+        {
+            Log.e(TAG, ">>>>>>>>>>>>>>>> Error in startTracking()");
+            stopTracking();
+        }
+    }
+
+    synchronized void stopTracking() {
+
+        // clear tracking
+        tracking.clear();
+
+        // check reader connection
+        if (!isReaderConnected()) return;
+
+        try
+        {
+            if (reader != null) {
+                Log.d(TAG, "STOPPING TRACKING. Found " + tags.size() + " tags");
+
+                // notify listener
+                if (listener != null) {
+                    listener.notify(INTERFACE, ZebraEvents.stopRead,new HashMap<>());
+                }
+
+                // stop the reader
+                reader.Actions.Inventory.stop();
+            }
+        }
+        catch (Exception e) {
+            Log.e(TAG, ">>>>>>>>>>>>>>>>>>>> Error in stopTracking()");
+        }
+    }
+
+    // configuration
+    private void setAntennaPower(int power) {
+        Log.d(TAG, "setAntennaPower " + power);
+        try {
+            // set antenna configurations
+            Antennas.AntennaRfConfig config = reader.Config.Antennas.getAntennaRfConfig(1);
+            config.setTransmitPowerIndex(power);
+            config.setrfModeTableIndex(0);
+            config.setTari(0);
+            reader.Config.Antennas.setAntennaRfConfig(1, config);
+        } catch (InvalidUsageException e) {
+            e.printStackTrace();
+        } catch (OperationFailureException e) {
+            e.printStackTrace();
+        }
+    }
+
+    private void setSingulation(SESSION session, INVENTORY_STATE state) {
+        Log.d(TAG, "setSingulation " + session);
+        try {
+            // Set the singulation control
+            Antennas.SingulationControl s1_singulationControl = reader.Config.Antennas.getSingulationControl(1);
+            s1_singulationControl.setSession(session);
+            s1_singulationControl.Action.setInventoryState(state);
+            s1_singulationControl.Action.setSLFlag(SL_FLAG.SL_ALL);
+            reader.Config.Antennas.setSingulationControl(1, s1_singulationControl);
+        } catch (InvalidUsageException e) {
+            e.printStackTrace();
+        } catch (OperationFailureException e) {
+            e.printStackTrace();
+        }
+    }
+
+    private void setDPO(boolean bEnable) {
+        Log.d(TAG, "setDPO " + bEnable);
+        try {
+            // control the DPO
+            reader.Config.setDPOState(bEnable ? DYNAMIC_POWER_OPTIMIZATION.ENABLE : DYNAMIC_POWER_OPTIMIZATION.DISABLE);
+        } catch (InvalidUsageException e) {
+            e.printStackTrace();
+        } catch (OperationFailureException e) {
+            e.printStackTrace();
+        }
+    }
+
+    private void setAccessOperationConfiguration() {
+        // set required power and profile
+        setAntennaPower(240);
+        // in case of RFD8500 disable DPO
+        if (reader.getHostName().contains("RFD8500"))
+            setDPO(false);
+        //
+        try {
+            // set access operation time out value to 1 second, so reader will tries for a second
+            // to perform operation before timing out
+            reader.Config.setAccessOperationWaitTimeout(1000);
+        } catch (InvalidUsageException e) {
+            e.printStackTrace();
+        } catch (OperationFailureException e) {
+            e.printStackTrace();
+        }
+    }
+
+    public void write(String epc, String newEpc, String password, String newPassword, String data) {
+
+        if (epc == null || epc.trim().equals("")) return;
+
+        setAccessOperationConfiguration();
+
+        // set default password
+        if (password == null || password.trim().length() == 0) password = "0";
+
+        boolean ok = true;
+
+        // write epc
+        if (epc != newEpc && newEpc != null && newEpc.trim().length() > 0) {
+            Exception exception = writeTag(epc, password, MEMORY_BANK.MEMORY_BANK_EPC, newEpc, 2);
+            if (exception != null) {
+                ok = false;
+                Log.e(TAG, "Error writing tag epc: " + exception.getMessage());
+                if (listener != null) {
+                    listener.notify(INTERFACE, ZebraEvents.writeFail, ZebraDevice.toError("Error writing tag epc", exception));
+                }
+            }
+            else epc = newEpc;
+        }
+
+        // write data
+        if (data != null && data.length() > 0) {
+            Exception exception = writeTag(epc, password, MEMORY_BANK.MEMORY_BANK_USER, data, 0);
+            if (exception != null) {
+                ok = false;
+                Log.e(TAG, "Error writing tag data: " + exception.getMessage());
+                if (listener != null) {
+                    listener.notify(INTERFACE, ZebraEvents.writeFail, ZebraDevice.toError("Error writing tag data", exception));
+                }
+            }
+            else data = "";
+        }
+
+        // change password
+        if (password != newPassword && newPassword != null && newPassword.trim().length() > 0) {
+            Exception exception = writeTag(epc, password, MEMORY_BANK.MEMORY_BANK_RESERVED, newPassword, 2);
+            if (exception != null) {
+                ok = false;
+                Log.e(TAG, "Error writing tag password: " + exception.getMessage());
+                if (listener != null) {
+                    listener.notify(INTERFACE, ZebraEvents.writeFail, ZebraDevice.toError("Error writing tag password", exception));
+                }
+            }
+            else password = newPassword;
+        }
+
+        if (listener != null && ok) {
+            HashMap<String,Object> hashMap = new HashMap<>();
+            TagInfo tag = new TagInfo();
+            tag.epc = epc;
+            tag.memoryBankData = data;
+            tag.password = password;
+            hashMap.put("tag",tag);
+            listener.notify(INTERFACE, ZebraEvents.writeSuccess, hashMap);
+        }
+    }
+
+
+    private Exception writeTag(String sourceEPC, String Password, MEMORY_BANK memory_bank, String targetData, int offset) {
+        Log.d(TAG, "WriteTag " + targetData);
+        try {
+            TagData tagData = null;
+            String tagId = sourceEPC;
+            TagAccess tagAccess = new TagAccess();
+            TagAccess.WriteAccessParams writeAccessParams = tagAccess.new WriteAccessParams();
+            String writeData = targetData; //write data in string
+            writeAccessParams.setAccessPassword(Long.parseLong(Password,16));
+            writeAccessParams.setMemoryBank(memory_bank);
+            writeAccessParams.setOffset(offset); // start writing from word offset 0
+            writeAccessParams.setWriteData(writeData);
+            // set retries in case of partial write happens
+            writeAccessParams.setWriteRetries(3);
+            // data length in words
+            writeAccessParams.setWriteDataLength(writeData.length() / 4);
+            // 5th parameter bPrefilter flag is true which means API will apply pre filter internally
+            // 6th parameter should be true in case of changing EPC ID it self i.e. source and target both is EPC
+            boolean useTIDfilter = memory_bank == MEMORY_BANK.MEMORY_BANK_EPC;
+            reader.Actions.TagAccess.writeWait(tagId, writeAccessParams, null, tagData, true, useTIDfilter);
+
+            return null;
+        }
+        catch (Exception e) {
+            e.printStackTrace();
+            return e;
         }
     }
 
@@ -463,7 +745,7 @@ public class ZebraRfid implements ZebraDevice, RfidEventsListener {
 
     private static class TagInfo {
 
-        public String id;
+        public String epc;
         public short antenna;
         public short rssi;
         public ACCESS_OPERATION_STATUS status;
@@ -472,6 +754,7 @@ public class ZebraRfid implements ZebraDevice, RfidEventsListener {
         public String lockData;
         public int size;
         public String seen;
+        public String password;
 
         TagInfo() {
             Date datetime = Calendar.getInstance().getTime();

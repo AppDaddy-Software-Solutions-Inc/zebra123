@@ -1,5 +1,6 @@
 package dev.fml.zebra123;
 
+import java.util.ArrayList;
 import java.util.HashMap;
 
 public interface ZebraDevice {
@@ -8,10 +9,22 @@ public interface ZebraDevice {
     public void disconnect();
     public void dispose();
     public void setMode(String mode);
+    public void scan(ZebraScanRequest request);
+    public void track(ZebraScanRequest request, ArrayList<String> tags);
+    public void write(String epc, String newEpc, String password, String newPassword, String data);
 
     enum ZebraInterfaces {
         rfidapi3,
         datawedge,
+        unknown
+    }
+
+
+    enum ZebraScanRequest {
+        rfidStartScanning,
+        rfidStopScanning,
+        rfidStartTracking,
+        rfidStopTracking,
         unknown
     }
 
@@ -20,6 +33,11 @@ public interface ZebraDevice {
         readBarcode,
         error,
         connectionStatus,
+        startRead,
+        stopRead,
+        writeFail,
+        writeSuccess,
+        support,
         unknown
     }
 

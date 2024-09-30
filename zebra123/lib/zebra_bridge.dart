@@ -5,25 +5,22 @@ import 'package:zebra123/zebra123.dart';
 
 /// bridge between flutter and android.
 class ZebraBridge {
+
   ZebraInterfaces interface = ZebraInterfaces.unknown;
   ZebraConnectionStatus connectionStatus = ZebraConnectionStatus.disconnected;
 
-  static late final StreamSubscription<dynamic> sink;
-
-  static const _methodChannel = MethodChannel("dev.fml.zebra123/method");
-
-  static const _eventChannel = EventChannel('dev.fml.zebra123/event');
-
-  final List<Zebra123> listeners = [];
-
-  static final ZebraBridge _singleton = ZebraBridge._init();
+  static final _methodChannel = const MethodChannel("dev.fml.zebra123/method");
+  static final _eventChannel  = EventChannel('dev.fml.zebra123/event');
+  static StreamSubscription<dynamic>? _sink;
+  static final List<Zebra123> listeners = [];
+  static final List<ZebraInterfaces> support = [];
 
   // creates a bridge instance
-  factory ZebraBridge() {
-    return _singleton;
-  }
-  ZebraBridge._init() {
-    sink = _eventChannel.receiveBroadcastStream().listen(_eventListener);
+  ZebraBridge({Zebra123? listener}) {
+    if (listener != null) {
+      addListener(listener);
+    }
+    _sink = _eventChannel.receiveBroadcastStream().listen(_eventListener);
     _methodChannel.invokeMethod("connect", {"hashCode": hashCode});
   }
 
@@ -43,18 +40,46 @@ class ZebraBridge {
 
   // invoke scan request
   void scan(ZebraScanRequest request) {
-    _methodChannel.invokeMethod("scan", {"request": fromEnum(request)});
+    _methodChannel.invokeMethod("scan", {"request": fromEnumerable(request)});
+  }
+
+  // invoke tracking request
+  void track(ZebraScanRequest request, {List<String>? tags}) {
+    String list = "";
+    for (var tag in tags ?? []) {
+      if (list == "") {
+        list = tag;
+      } else {
+        list += ",$tag";
+      }
+    }
+    _methodChannel.invokeMethod(
+        "track", {"request": fromEnumerable(request), "tags": list});
+  }
+
+  // invoke write request
+  void write(String epc,
+      {String? epcNew, double? password, double? passwordNew, String? data}) {
+    _methodChannel.invokeMethod("write", {
+      "epc": epc,
+      "epcNew": epcNew ?? "",
+      "password": (password ?? "").toString(),
+      "passwordNew": (passwordNew ?? "").toString(),
+      "data": data ?? "",
+    });
   }
 
   // zebra events listener
   void _eventListener(dynamic payload) {
     try {
+
       final map = Map<String, dynamic>.from(payload);
       interface =
-          toEnum(map['eventSource'] as String, ZebraInterfaces.values) ??
+          toEnumerable(map['eventSource'] as String, ZebraInterfaces.values) ??
               interface;
-      final event = toEnum(map['eventName'] as String, ZebraEvents.values) ??
-          ZebraEvents.unknown;
+      final event =
+          toEnumerable(map['eventName'] as String, ZebraEvents.values) ??
+              ZebraEvents.unknown;
 
       switch (event) {
         case ZebraEvents.readRfid:
@@ -62,7 +87,7 @@ class ZebraBridge {
           List<dynamic> tags = map["tags"];
           for (var i = 0; i < tags.length; i++) {
             var tag = Map<String, dynamic>.from(tags[i]);
-            tag["eventSource"] = fromEnum(interface);
+            tag["eventSource"] = fromEnumerable(interface);
             list.add(RfidTag.fromMap(tag));
           }
 
@@ -83,6 +108,41 @@ class ZebraBridge {
             listener.callback(interface, event, list);
           }
 
+          break;
+
+        case ZebraEvents.writeFail:
+          var error = Error.fromMap(map);
+
+          // notify listeners
+          for (var listener in listeners) {
+            listener.callback(interface, event, error);
+          }
+          break;
+
+        case ZebraEvents.writeSuccess:
+          var tag = RfidTag.fromMap(map);
+
+          // notify listeners
+          for (var listener in listeners) {
+            listener.callback(interface, event, tag);
+          }
+          break;
+
+        case ZebraEvents.support:
+          if (map.containsKey(fromEnumerable(ZebraInterfaces.rfidapi3))) {
+            var supports =
+                toBool(map[fromEnumerable(ZebraInterfaces.rfidapi3)]) ?? false;
+            if (supports && !support.contains(ZebraInterfaces.rfidapi3)) {
+              support.add(ZebraInterfaces.rfidapi3);
+            }
+          }
+          if (map.containsKey(fromEnumerable(ZebraInterfaces.datawedge))) {
+            var supports =
+                toBool(map[fromEnumerable(ZebraInterfaces.datawedge)]) ?? false;
+            if (supports && !support.contains(ZebraInterfaces.datawedge)) {
+              support.add(ZebraInterfaces.datawedge);
+            }
+          }
           break;
 
         case ZebraEvents.error:
@@ -106,7 +166,12 @@ class ZebraBridge {
 
           break;
 
+        // unknown event
         default:
+        // notify listeners
+          for (var listener in listeners) {
+            listener.callback(interface, event, null);
+          }
           break;
       }
     } catch (e) {

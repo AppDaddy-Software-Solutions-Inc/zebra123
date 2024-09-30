@@ -15,22 +15,25 @@ import java.util.HashMap;
 import io.flutter.embedding.engine.plugins.FlutterPlugin;
 import io.flutter.plugin.common.EventChannel;
 import io.flutter.plugin.common.EventChannel.StreamHandler;
-import io.flutter.plugin.common.EventChannel.EventSink;
 import io.flutter.plugin.common.MethodCall;
 import io.flutter.plugin.common.MethodChannel;
 import io.flutter.plugin.common.MethodChannel.MethodCallHandler;
 import io.flutter.plugin.common.MethodChannel.Result;
 
 /** Zebra123 */
-public class Zebra123 implements FlutterPlugin, MethodCallHandler, StreamHandler {
+public class Zebra123 implements FlutterPlugin, MethodCallHandler, StreamHandler, ZebraDeviceListener {
 
   public  final static String PLUGIN = "zebra123";
   private final static String TAG = PLUGIN;
 
   private static final ZebraDevice.ZebraInterfaces INTERFACE = ZebraDevice.ZebraInterfaces.unknown;
 
-  private MethodChannel methodHandler;
-  private EventChannel eventHandler;
+  private static MethodChannel methodHandler;
+  private static EventChannel eventHandler;
+
+  private Handler handler = new Handler(Looper.getMainLooper());
+
+  private EventChannel.EventSink sink = null;
 
   private ZebraDevice device;
 
@@ -47,19 +50,31 @@ public class Zebra123 implements FlutterPlugin, MethodCallHandler, StreamHandler
 
     context = flutterPluginBinding.getApplicationContext();
 
-    //if (methodHandler != null) methodHandler.setMethodCallHandler(null);
+    if (methodHandler != null) methodHandler.setMethodCallHandler(null);
     methodHandler = new MethodChannel(flutterPluginBinding.getBinaryMessenger(), METHODCHANNEL);
     methodHandler.setMethodCallHandler(this);
 
+    if (eventHandler != null) eventHandler.setStreamHandler(null);
     eventHandler = new EventChannel(flutterPluginBinding.getBinaryMessenger(), EVENTCHANNEL);
     eventHandler.setStreamHandler(this);
+
+    // set connection support
+    supportsRfid = ZebraRfid.isSupported(context);
+    supportsDatawedge = ZebraDataWedge.isSupported(context);
+
+    connect();
   }
 
   @Override
   public void onDetachedFromEngine(@NonNull FlutterPluginBinding binding) {
-    disconnect();
+
     methodHandler.setMethodCallHandler(null);
+    methodHandler = null;
+
     eventHandler.setStreamHandler(null);
+    eventHandler = null;
+
+    //disconnect();
   }
 
   @Override
@@ -68,6 +83,14 @@ public class Zebra123 implements FlutterPlugin, MethodCallHandler, StreamHandler
     String method = call.method;
 
     switch (method) {
+
+      case "connect":
+        connect();
+        break;
+
+      // disconnect from the device
+      case "disconnect":
+        break;
 
       case "track":
         if (device != null) {
@@ -113,28 +136,6 @@ public class Zebra123 implements FlutterPlugin, MethodCallHandler, StreamHandler
     result.success(null);
   }
 
-  @Override
-  public void onListen(Object arguments, EventChannel.EventSink sink) {
-
-    // set connection support
-    supportsRfid = ZebraRfid.isSupported(context);
-    supportsDatawedge = ZebraDataWedge.isSupported(context);
-
-    // notify device support
-    HashMap<String, Object> map = new HashMap<>();
-    map.put(ZebraDevice.ZebraInterfaces.rfidapi3.toString(),supportsRfid ? "true" : "false");
-    map.put(ZebraDevice.ZebraInterfaces.datawedge.toString(),supportsDatawedge ? "true" : "false");
-    sendEvent(sink, ZebraDevice.ZebraEvents.support,map);
-
-    // connect the device
-    connect(sink);
-  }
-
-  @Override
-  public void onCancel(Object arguments) {
-    Log.w(TAG, "cancelling listener");
-  }
-
   String argument(MethodCall call, String key) {
     try {
       return call.argument(key).toString();
@@ -143,24 +144,23 @@ public class Zebra123 implements FlutterPlugin, MethodCallHandler, StreamHandler
       return "";
     }
   }
-
-  private void connect(EventSink sink) {
+  private void connect() {
 
     try {
 
       // disconnect if already connected
-      if (device != null) device.disconnect();
+      //if (device != null) device.disconnect();
       device = null;
 
       // device supports rfid?
       if (supportsRfid) {
-        device = new ZebraRfid(context, sink);
+        device = new ZebraRfid(context, this);
         device.connect();
       }
 
       // datawedge supported?
       else if (supportsDatawedge) {
-        device = new ZebraDataWedge(context, sink);
+        device = new ZebraDataWedge(context, this);
         device.connect();
       }
 
@@ -170,12 +170,12 @@ public class Zebra123 implements FlutterPlugin, MethodCallHandler, StreamHandler
         map.put("status", ZebraDevice.ZebraConnectionStatus.error.toString());
 
         // notify device
-        sendEvent(sink, ZebraDevice.ZebraEvents.connectionStatus,map);
+        notify(INTERFACE, ZebraDevice.ZebraEvents.connectionStatus,map);
       }
     }
     catch(Exception e) {
         Log.e(TAG, "Error connecting to device" + e.getMessage());
-        sendEvent(sink, ZebraDevice.ZebraEvents.error, ZebraDevice.toError("Error during connect()", e));
+        notify(INTERFACE, ZebraDevice.ZebraEvents.error, ZebraDevice.toError("Error during connect()", e));
     }
   }
 
@@ -185,18 +185,45 @@ public class Zebra123 implements FlutterPlugin, MethodCallHandler, StreamHandler
     }
   }
 
-  public void sendEvent(final EventSink sink, final ZebraDevice.ZebraEvents event, final HashMap map) {
+  @Override
+  public void onListen(Object arguments, EventChannel.EventSink sink) {
+
+    Log.d(TAG, ">>>>>>>>>>>>>>>>>>>>>>>>>>>>> Setting Sink");
+    this.sink = sink;
+
+
+    // notify device support
+    HashMap<String, Object> map =new HashMap<>();
+    map.put(ZebraDevice.ZebraInterfaces.rfidapi3.toString(),supportsRfid ? "true" : "false");
+    map.put(ZebraDevice.ZebraInterfaces.datawedge.toString(),supportsDatawedge ? "true" : "false");
+    notify(INTERFACE, ZebraDevice.ZebraEvents.support,map);
+  }
+
+  @Override
+  public void onCancel(Object arguments) {
+    Log.w(TAG, "cancelling listener");
+    sink = null;
+  }
+
+  @Override
+  public void notify(final ZebraDevice.ZebraInterfaces source, final ZebraDevice.ZebraEvents event, final HashMap map) {
 
     if (sink == null) Log.e(TAG, "Can't send notification to flutter. Sink is null");
-    try
-    {
-      map.put("eventSource", INTERFACE.toString());
-      map.put("eventName", event.toString());
-      sink.success(map);
-    }
-    catch (Exception e)
-    {
-      Log.e(TAG, "Error sending notification to flutter. Error: " + e.getMessage());
+
+    if (sink != null) {
+      handler.post(() -> {
+          try
+          {
+            map.put("eventSource", source.toString());
+            map.put("eventName", event.toString());
+            sink.success(map);
+          }
+          catch (Exception e)
+          {
+            Log.e(TAG, "Error sending notification to flutter");
+          }
+      });
     }
   }
+
 }
