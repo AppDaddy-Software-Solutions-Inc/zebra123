@@ -1,8 +1,6 @@
 package dev.fml.zebra123;
 
 import android.content.Context;
-import android.os.Handler;
-import android.os.Looper;
 import android.util.Log;
 import android.widget.Toast;
 
@@ -65,11 +63,16 @@ public class Zebra123 implements FlutterPlugin, MethodCallHandler, StreamHandler
   @Override
   public void onMethodCall(@NonNull MethodCall call, @NonNull Result result) {
 
-    ZebraDevice.Methods method = toEnumerable(call.method.toString(), ZebraDevice.Methods);
+    // get method
+    ZebraDevice.ZebraMethods method = ZebraDevice.ZebraMethods.unknown;
+    try {
+      method = ZebraDevice.ZebraMethods.valueOf(call.method);
+    }
+    catch(Exception e) {}
 
     switch (method) {
 
-      case ZebraMethods.track:
+      case track:
         if (device != null) {
           ZebraDevice.ZebraScanRequest request = ZebraDevice.ZebraScanRequest.unknown;
           ArrayList<String> list = new ArrayList<>();
@@ -83,7 +86,7 @@ public class Zebra123 implements FlutterPlugin, MethodCallHandler, StreamHandler
         }
         break;
 
-      case ZebraMethods.scan:
+      case scan:
         if (device != null) {
           ZebraDevice.ZebraScanRequest request = ZebraDevice.ZebraScanRequest.unknown;
           try {
@@ -94,7 +97,7 @@ public class Zebra123 implements FlutterPlugin, MethodCallHandler, StreamHandler
         }
         break;
 
-      case ZebraMethods.write:
+      case write:
         if (device != null) {
           String epc         = argument(call,"epc");
           String newEpc      = argument(call,"epcNew");

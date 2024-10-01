@@ -18,7 +18,7 @@ public interface ZebraDevice {
         unknown
     }
 
-    enum Methods {
+    enum ZebraMethods {
         track,
         scan,
         write,
