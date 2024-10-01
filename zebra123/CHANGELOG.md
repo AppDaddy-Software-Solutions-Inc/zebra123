@@ -100,3 +100,11 @@
 * fixed datawedge barcode reads happen 2x. 
 * fixed scanner reinitialization issue when application is paused
 * added soft scan for data wedge
+
+## 3.0.1
+
+* fixed analysis issues 
+
+## 3.0.2
+
+* fixed dart formatter issues 

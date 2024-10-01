@@ -1,9 +1,13 @@
+/// zebra modes (not implemented)
 enum Mode { barcode, rfid }
 
+/// zebra device interfaces
 enum Interfaces { rfidapi3, datawedge, unknown }
 
+/// zebra method request parameters
 enum Requests { start, stop, unknown }
 
+/// zebra events
 enum Events {
   readRfid,
   readBarcode,
@@ -17,4 +21,5 @@ enum Events {
   unknown
 }
 
+/// zebra connection status
 enum Status { disconnected, connected, error, unknown }

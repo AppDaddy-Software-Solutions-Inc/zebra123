@@ -26,7 +26,53 @@ class Barcode {
   }
 }
 
-/// connection status class holds the rfid tag data
+/// rfid class holds the rfid tag data
+class RfidTag {
+  String epc;
+  int antenna;
+  int rssi;
+  int distance;
+  String memoryBankData;
+  String lockData;
+  int size;
+  String seen;
+
+  // required for write operation
+  String? epcNew;
+  String? password;
+  String? passwordNew;
+
+  Interfaces interface;
+
+  RfidTag(
+      {required this.epc,
+      required this.antenna,
+      required this.rssi,
+      required this.distance,
+      required this.memoryBankData,
+      required this.lockData,
+      required this.size,
+      required this.seen,
+      required this.interface});
+
+  // create a rfid tag from a map
+  factory RfidTag.fromMap(Map<String, dynamic> map) {
+    return RfidTag(
+      epc: map['epc'] ?? '',
+      antenna: map['antenna']?.toInt() ?? 0,
+      rssi: map['rssi']?.toInt() ?? 0,
+      distance: map['distance']?.toInt() ?? 0,
+      memoryBankData: map['memoryBankData'] ?? '',
+      lockData: map['lockData'] ?? '',
+      size: map['size']?.toInt() ?? 0,
+      seen: map['seen'] ?? '',
+      interface:
+          toEnum(map['eventSource'], Interfaces.values) ?? Interfaces.unknown,
+    );
+  }
+}
+
+/// connection status class holds the device connection state
 class ConnectionStatus {
   Status status = Status.unknown;
 
@@ -42,6 +88,7 @@ class ConnectionStatus {
   }
 }
 
+/// zebra error
 class Error {
   String source = "";
   String message = "";

@@ -4,10 +4,10 @@ export 'classes.dart';
 
 import 'dart:async';
 import 'classes.dart';
-import 'helpers.dart';
 import 'bridge.dart';
 import 'enums.dart';
 
+// callback function for zebra events
 typedef Callback = void Function(
     Interfaces interface, Events event, dynamic data);
 
@@ -50,6 +50,9 @@ class Zebra123 {
           ConnectionStatus(status: Status.disconnected));
     }
   }
+
+  // return true if bridge contains "this" (listener)
+  bool get isListening => _bridge.contains(this);
 
   // start scanning for rfid tags
   Future startScanning() async {
@@ -108,51 +111,5 @@ class Zebra123 {
   // dispose of the zebra plugin
   Future dispose() async {
     disconnect();
-  }
-}
-
-/// rfid class holds the rfid tag data
-class RfidTag {
-  String epc;
-  int antenna;
-  int rssi;
-  int distance;
-  String memoryBankData;
-  String lockData;
-  int size;
-  String seen;
-
-  // required for write operation
-  String? epcNew;
-  String? password;
-  String? passwordNew;
-
-  Interfaces interface;
-
-  RfidTag(
-      {required this.epc,
-      required this.antenna,
-      required this.rssi,
-      required this.distance,
-      required this.memoryBankData,
-      required this.lockData,
-      required this.size,
-      required this.seen,
-      required this.interface});
-
-  // create a rfid tag from a map
-  factory RfidTag.fromMap(Map<String, dynamic> map) {
-    return RfidTag(
-      epc: map['epc'] ?? '',
-      antenna: map['antenna']?.toInt() ?? 0,
-      rssi: map['rssi']?.toInt() ?? 0,
-      distance: map['distance']?.toInt() ?? 0,
-      memoryBankData: map['memoryBankData'] ?? '',
-      lockData: map['lockData'] ?? '',
-      size: map['size']?.toInt() ?? 0,
-      seen: map['seen'] ?? '',
-      interface:
-          toEnum(map['eventSource'], Interfaces.values) ?? Interfaces.unknown,
-    );
   }
 }
