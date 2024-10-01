@@ -25,7 +25,7 @@ public class Zebra123 implements FlutterPlugin, MethodCallHandler, StreamHandler
   public  final static String PLUGIN = "zebra123";
   private final static String TAG = PLUGIN;
 
-  private static final ZebraDevice.ZebraInterfaces INTERFACE = ZebraDevice.ZebraInterfaces.unknown;
+  private static final ZebraDevice.Interfaces INTERFACE = ZebraDevice.Interfaces.unknown;
 
   private MethodChannel methodHandler;
   private EventChannel eventHandler;
@@ -64,9 +64,9 @@ public class Zebra123 implements FlutterPlugin, MethodCallHandler, StreamHandler
   public void onMethodCall(@NonNull MethodCall call, @NonNull Result result) {
 
     // get method
-    ZebraDevice.ZebraMethods method = ZebraDevice.ZebraMethods.unknown;
+    ZebraDevice.Methods method = ZebraDevice.Methods.unknown;
     try {
-      method = ZebraDevice.ZebraMethods.valueOf(call.method);
+      method = ZebraDevice.Methods.valueOf(call.method);
     }
     catch(Exception e) {}
 
@@ -74,10 +74,10 @@ public class Zebra123 implements FlutterPlugin, MethodCallHandler, StreamHandler
 
       case track:
         if (device != null) {
-          ZebraDevice.ZebraScanRequest request = ZebraDevice.ZebraScanRequest.unknown;
+          ZebraDevice.Requests request = ZebraDevice.Requests.unknown;
           ArrayList<String> list = new ArrayList<>();
           try {
-            request = ZebraDevice.ZebraScanRequest.valueOf(argument(call,"request"));
+            request = ZebraDevice.Requests.valueOf(argument(call,"request"));
             String tags = argument(call,"tags");
             if (tags!= null) list.addAll(Arrays.asList(tags.split(",")));
           }
@@ -88,9 +88,9 @@ public class Zebra123 implements FlutterPlugin, MethodCallHandler, StreamHandler
 
       case scan:
         if (device != null) {
-          ZebraDevice.ZebraScanRequest request = ZebraDevice.ZebraScanRequest.unknown;
+          ZebraDevice.Requests request = ZebraDevice.Requests.unknown;
           try {
-            request = ZebraDevice.ZebraScanRequest.valueOf(argument(call,"request"));
+            request = ZebraDevice.Requests.valueOf(argument(call,"request"));
           }
           catch(Exception e) {}
           device.scan(request);
@@ -125,9 +125,9 @@ public class Zebra123 implements FlutterPlugin, MethodCallHandler, StreamHandler
 
     // notify device support
     HashMap<String, Object> map = new HashMap<>();
-    map.put(ZebraDevice.ZebraInterfaces.rfidapi3.toString(),supportsRfid ? "true" : "false");
-    map.put(ZebraDevice.ZebraInterfaces.datawedge.toString(),supportsDatawedge ? "true" : "false");
-    sendEvent(sink, ZebraDevice.ZebraEvents.support,map);
+    map.put(ZebraDevice.Interfaces.rfidapi3.toString(),supportsRfid ? "true" : "false");
+    map.put(ZebraDevice.Interfaces.datawedge.toString(),supportsDatawedge ? "true" : "false");
+    sendEvent(sink, ZebraDevice.Events.support,map);
 
     // connect the device
     connect(sink);
@@ -173,12 +173,12 @@ public class Zebra123 implements FlutterPlugin, MethodCallHandler, StreamHandler
         map.put("status", ZebraDevice.ZebraConnectionStatus.error.toString());
 
         // notify device
-        sendEvent(sink, ZebraDevice.ZebraEvents.connectionStatus,map);
+        sendEvent(sink, ZebraDevice.Events.connectionStatus,map);
       }
     }
     catch(Exception e) {
         Log.e(TAG, "Error connecting to device" + e.getMessage());
-        sendEvent(sink, ZebraDevice.ZebraEvents.error, ZebraDevice.toError("Error during connect()", e));
+        sendEvent(sink, ZebraDevice.Events.error, ZebraDevice.toError("Error during connect()", e));
     }
   }
 
@@ -188,7 +188,7 @@ public class Zebra123 implements FlutterPlugin, MethodCallHandler, StreamHandler
     }
   }
 
-  public void sendEvent(final EventSink sink, final ZebraDevice.ZebraEvents event, final HashMap map) {
+  public void sendEvent(final EventSink sink, final ZebraDevice.Events event, final HashMap map) {
 
     if (sink == null) Log.e(TAG, "Can't send notification to flutter. Sink is null");
     try

@@ -6,44 +6,73 @@ import 'package:zebra123/zebra123.dart';
 /// bridge between flutter and android.
 class ZebraBridge {
 
-  ZebraInterfaces interface = ZebraInterfaces.unknown;
-  ZebraConnectionStatus connectionStatus = ZebraConnectionStatus.disconnected;
+  var _interface = Interfaces.unknown;
+  Interfaces get interface => _interface;
 
-  static final _methodChannel = const MethodChannel("dev.fml.zebra123/method");
-  static final _eventChannel  = EventChannel('dev.fml.zebra123/event');
-  static StreamSubscription<dynamic>? _sink;
-  static final List<Zebra123> listeners = [];
-  static final List<ZebraInterfaces> support = [];
+  var _status = Status.disconnected;
+  Status get status => _status;
 
-  // creates a bridge instance
-  ZebraBridge({Zebra123? listener}) {
+  final List<Zebra123> _listeners = [];
+
+  final List<Interfaces> _supported = [];
+  bool supports(Interfaces interface) => _supported.contains(interface);
+
+  late final MethodChannel _methodChannel;
+  late final EventChannel  _eventChannel;
+  late final StreamSubscription<dynamic>? _sink;
+
+  static ZebraBridge? _singleton;
+
+  /// Constructs a singleton instance of [ZebraBridge].
+  ///
+  /// [ZebraBridge] is designed to work as a singleton.
+  // When a second instance is created, the first instance will not be able to listen to the
+  // EventChannel because it is overridden. Forcing the class to be a singleton class can prevent
+  // misuse of creating a second instance from a programmer.
+  factory ZebraBridge({Zebra123? listener}) {
+    _singleton ??= ZebraBridge._();
     if (listener != null) {
-      addListener(listener);
+      _singleton!.addListener(listener);
     }
+    return _singleton!;
+  }
+
+  ZebraBridge._()
+  {
+    // create method channel
+    _methodChannel = const MethodChannel("dev.fml.zebra123/method");
+
+    // create event channel
+    _eventChannel  = const EventChannel("dev.fml.zebra123/event");
+
+    // listen for events
     _sink = _eventChannel.receiveBroadcastStream().listen(_eventListener);
   }
 
+  // returns true is specified listener is ion the _listener list
+  bool contains(Zebra123 listener) => _listeners.contains(listener);
+
   // listen for zebra events
   void addListener(Zebra123 listener) {
-    if (!listeners.contains(listener)) {
-      listeners.add(listener);
+    if (!contains(listener)) {
+      _listeners.add(listener);
     }
   }
 
   // stop listening to zebra events
   void removeListener(Zebra123 listener) {
-    if (listeners.contains(listener)) {
-      listeners.remove(listener);
+    if (contains(listener)) {
+      _listeners.remove(listener);
     }
   }
 
   // invoke scan request
-  void scan(ZebraScanRequest request) {
+  void scan(Requests request) {
     _methodChannel.invokeMethod("scan", {"request": fromEnumerable(request)});
   }
 
   // invoke tracking request
-  void track(ZebraScanRequest request, {List<String>? tags}) {
+  void track(Requests request, {List<String>? tags}) {
     String list = "";
     for (var tag in tags ?? []) {
       if (list == "") {
@@ -73,94 +102,94 @@ class ZebraBridge {
     try {
 
       final map = Map<String, dynamic>.from(payload);
-      interface =
-          toEnumerable(map['eventSource'] as String, ZebraInterfaces.values) ??
-              interface;
+      _interface =
+          toEnumerable(map['eventSource'] as String, Interfaces.values) ??
+              _interface;
       final event =
-          toEnumerable(map['eventName'] as String, ZebraEvents.values) ??
-              ZebraEvents.unknown;
+          toEnumerable(map['eventName'] as String, Events.values) ??
+              Events.unknown;
 
       switch (event) {
-        case ZebraEvents.readRfid:
+        case Events.readRfid:
           List<RfidTag> list = [];
           List<dynamic> tags = map["tags"];
           for (var i = 0; i < tags.length; i++) {
             var tag = Map<String, dynamic>.from(tags[i]);
-            tag["eventSource"] = fromEnumerable(interface);
+            tag["eventSource"] = fromEnumerable(_interface);
             list.add(RfidTag.fromMap(tag));
           }
 
           // notify listeners
-          for (var listener in listeners) {
-            listener.callback(interface, event, list);
+          for (var listener in _listeners) {
+            listener.callback(_interface, event, list);
           }
 
           break;
 
-        case ZebraEvents.readBarcode:
+        case Events.readBarcode:
           List<Barcode> list = [];
           var tag = Barcode.fromMap(map);
           list.add(tag);
 
           // notify listeners
-          for (var listener in listeners) {
-            listener.callback(interface, event, list);
+          for (var listener in _listeners) {
+            listener.callback(_interface, event, list);
           }
 
           break;
 
-        case ZebraEvents.writeFail:
+        case Events.writeFail:
           var error = Error.fromMap(map);
 
           // notify listeners
-          for (var listener in listeners) {
-            listener.callback(interface, event, error);
+          for (var listener in _listeners) {
+            listener.callback(_interface, event, error);
           }
           break;
 
-        case ZebraEvents.writeSuccess:
+        case Events.writeSuccess:
           var tag = RfidTag.fromMap(map);
 
           // notify listeners
-          for (var listener in listeners) {
-            listener.callback(interface, event, tag);
+          for (var listener in _listeners) {
+            listener.callback(_interface, event, tag);
           }
           break;
 
-        case ZebraEvents.support:
-          if (map.containsKey(fromEnumerable(ZebraInterfaces.rfidapi3))) {
+        case Events.support:
+          if (map.containsKey(fromEnumerable(Interfaces.rfidapi3))) {
             var supports =
-                toBool(map[fromEnumerable(ZebraInterfaces.rfidapi3)]) ?? false;
-            if (supports && !support.contains(ZebraInterfaces.rfidapi3)) {
-              support.add(ZebraInterfaces.rfidapi3);
+                toBool(map[fromEnumerable(Interfaces.rfidapi3)]) ?? false;
+            if (supports && !_supported.contains(Interfaces.rfidapi3)) {
+              _supported.add(Interfaces.rfidapi3);
             }
           }
-          if (map.containsKey(fromEnumerable(ZebraInterfaces.datawedge))) {
+          if (map.containsKey(fromEnumerable(Interfaces.datawedge))) {
             var supports =
-                toBool(map[fromEnumerable(ZebraInterfaces.datawedge)]) ?? false;
-            if (supports && !support.contains(ZebraInterfaces.datawedge)) {
-              support.add(ZebraInterfaces.datawedge);
+                toBool(map[fromEnumerable(Interfaces.datawedge)]) ?? false;
+            if (supports && !_supported.contains(Interfaces.datawedge)) {
+              _supported.add(Interfaces.datawedge);
             }
           }
           break;
 
-        case ZebraEvents.error:
+        case Events.error:
           var error = Error.fromMap(map);
 
           // notify listeners
-          for (var listener in listeners) {
-            listener.callback(interface, event, error);
+          for (var listener in _listeners) {
+            listener.callback(_interface, event, error);
           }
 
           break;
 
-        case ZebraEvents.connectionStatus:
+        case Events.connectionStatus:
           var connection = ConnectionStatus.fromMap(map);
-          connectionStatus = connection.status;
+          _status = connection.status;
 
           // notify listeners
-          for (var listener in listeners) {
-            listener.callback(interface, event, connection);
+          for (var listener in _listeners) {
+            listener.callback(_interface, event, connection);
           }
 
           break;
@@ -168,8 +197,8 @@ class ZebraBridge {
         // unknown event
         default:
         // notify listeners
-          for (var listener in listeners) {
-            listener.callback(interface, event, null);
+          for (var listener in _listeners) {
+            listener.callback(_interface, event, null);
           }
           break;
       }

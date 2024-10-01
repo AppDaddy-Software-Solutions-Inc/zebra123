@@ -406,11 +406,11 @@ class _MyAppState extends State<MyApp> {
     );
   }
 
-  void callback(ZebraInterfaces interface, ZebraEvents event, dynamic data) {
+  void callback(ZebraInterfaces interface, Events event, dynamic data) {
     this.interface = interface;
 
     switch (event) {
-      case ZebraEvents.readBarcode:
+      case Events.readBarcode:
         barcodes.clear();
         if (data is List<Barcode>) {
           for (Barcode barcode in data) {
@@ -424,7 +424,7 @@ class _MyAppState extends State<MyApp> {
         setState(() {});
         break;
 
-      case ZebraEvents.readRfid:
+      case Events.readRfid:
         tags.clear();
         if (data is List<RfidTag>) {
           for (RfidTag tag in data) {
@@ -438,13 +438,13 @@ class _MyAppState extends State<MyApp> {
         setState(() {});
         break;
 
-      case ZebraEvents.error:
+      case Events.error:
         if (data is Error) {
           if (kDebugMode) print("Interface: $interface Error: ${data.message}");
         }
         break;
 
-      case ZebraEvents.connectionStatus:
+      case Events.connectionStatus:
         if (data is ConnectionStatus) {
           if (kDebugMode) {
             print("Interface: $interface ConnectionStatus: ${data.status}");

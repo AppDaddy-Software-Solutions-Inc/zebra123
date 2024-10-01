@@ -23,7 +23,7 @@ public class ZebraDataWedge extends BroadcastReceiver implements ZebraDevice {
 
     private static final String TAG = "zebra123";
 
-    private static final ZebraInterfaces INTERFACE = ZebraInterfaces.datawedge;
+    private static final Interfaces INTERFACE = Interfaces.datawedge;
 
     private Context context;
     private EventSink sink = null;
@@ -93,13 +93,13 @@ public class ZebraDataWedge extends BroadcastReceiver implements ZebraDevice {
                 seenLast = seen;
 
                 // notify listener
-                Log.d(TAG, ZebraEvents.readBarcode + ": " + tag);
+                Log.d(TAG, Events.readBarcode + ": " + tag);
 
-                sendEvent(ZebraEvents.readBarcode, tag);
+                sendEvent(Events.readBarcode, tag);
             }
             catch(Exception e) {
                 Log.e(TAG, "Error deserializing json object" + e.getMessage());
-                sendEvent(ZebraEvents.error, ZebraDevice.toError("onReceive()", e));
+                sendEvent(Events.error, ZebraDevice.toError("onReceive()", e));
             }
         }
     }
@@ -139,11 +139,11 @@ public class ZebraDataWedge extends BroadcastReceiver implements ZebraDevice {
             map.put("status", ZebraConnectionStatus.connected.toString());
 
             // notify device
-            sendEvent(ZebraEvents.connectionStatus,map);
+            sendEvent(Events.connectionStatus,map);
         }
         catch(Exception e) {
             Log.e(TAG, "Error connecting to device" + e.getMessage());
-            sendEvent(ZebraEvents.error, ZebraDevice.toError("connect()", e));
+            sendEvent(Events.error, ZebraDevice.toError("connect()", e));
         }
     }
 
@@ -157,11 +157,11 @@ public class ZebraDataWedge extends BroadcastReceiver implements ZebraDevice {
             map.put("status", ZebraConnectionStatus.disconnected.toString());
 
             // notify device
-            sendEvent(ZebraEvents.connectionStatus,map);
+            sendEvent(Events.connectionStatus,map);
         }
         catch(Exception e) {
             Log.e(TAG, "Error disconnecting from device" + e.getMessage());
-            sendEvent(ZebraEvents.error, ZebraDevice.toError("disconnect()", e));
+            sendEvent(Events.error, ZebraDevice.toError("disconnect()", e));
         }
     }
 
@@ -171,29 +171,35 @@ public class ZebraDataWedge extends BroadcastReceiver implements ZebraDevice {
     }
 
     @Override
-    public void scan(ZebraScanRequest request) {
-        Exception exception = new Exception("Not implemented");
-        sendEvent(ZebraEvents.error, ZebraDevice.toError("Error writing tag data", exception));
+    public void scan(Requests request) {
+
+        // set the scanner to start or stop scanning
+        String parameter = request == Requests.start ? "START_SCANNING" : "STOP_SCANNING";
+        String command   = "com.symbol.datawedge.api.SOFT_SCAN_TRIGGER";
+        sendCommandString(command, parameter, false);
+
+        //Exception exception = new Exception("Not implemented");
+        //sendEvent(Events.error, ZebraDevice.toError("Error writing tag data", exception));
         return;
     }
 
     @Override
-    public void track(ZebraScanRequest request, ArrayList<String> tags) {
+    public void track(Requests request, ArrayList<String> tags) {
         Exception exception = new Exception("Not implemented");
-        sendEvent(ZebraEvents.error, ZebraDevice.toError("Error calling track()", exception));
+        sendEvent(Events.error, ZebraDevice.toError("Error calling track()", exception));
         return;
     }
 
     @Override
     public void write(String epc, String newEpc, String password, String newPassword, String data) {
         Exception exception = new Exception("Not implemented");
-        sendEvent(ZebraEvents.error, ZebraDevice.toError("Error calling write()", exception));
+        sendEvent(Events.error, ZebraDevice.toError("Error calling write()", exception));
         return;
     }
 
     public void setMode(String mode) {
         Exception exception = new Exception("Not implemented");
-        sendEvent(ZebraEvents.error, ZebraDevice.toError("Error calling setMode()", exception));
+        sendEvent(Events.error, ZebraDevice.toError("Error calling setMode()", exception));
         return;
     }
 
@@ -275,7 +281,7 @@ public class ZebraDataWedge extends BroadcastReceiver implements ZebraDevice {
         sendCommandString("com.symbol.datawedge.api.SCANNER_INPUT_PLUGIN", "ENABLE_PLUGIN", false);
     }
 
-    private void sendEvent(final ZebraDevice.ZebraEvents event, final HashMap map) {
+    private void sendEvent(final ZebraDevice.Events event, final HashMap map) {
 
         if (sink == null) Log.e(TAG, "Can't send notification to flutter. Sink is null");
         try

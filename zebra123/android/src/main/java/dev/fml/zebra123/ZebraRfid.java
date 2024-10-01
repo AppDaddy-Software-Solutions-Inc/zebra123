@@ -51,7 +51,7 @@ public class ZebraRfid implements ZebraDevice, RfidEventsListener {
 
     private static final String TAG = "zebra123";
 
-    private static final ZebraInterfaces INTERFACE = ZebraInterfaces.rfidapi3;
+    private static final Interfaces INTERFACE = Interfaces.rfidapi3;
 
     Context context;
     private EventSink sink = null;
@@ -270,7 +270,7 @@ public class ZebraRfid implements ZebraDevice, RfidEventsListener {
                 map.put("status", ZebraConnectionStatus.connected.toString());
 
                 // notify device
-                sendEvent(ZebraEvents.connectionStatus,map);
+                sendEvent(Events.connectionStatus,map);
             }
 
             @Override
@@ -292,7 +292,7 @@ public class ZebraRfid implements ZebraDevice, RfidEventsListener {
             map.put("status", ZebraConnectionStatus.disconnected.toString());
 
             // notify device
-            sendEvent(ZebraEvents.connectionStatus,map);
+            sendEvent(Events.connectionStatus,map);
 
         } catch (Exception e) {
             e.printStackTrace();
@@ -300,22 +300,22 @@ public class ZebraRfid implements ZebraDevice, RfidEventsListener {
     }
 
     @Override
-    public void scan(ZebraScanRequest request) {
+    public void scan(Requests request) {
 
-        if (request == ZebraScanRequest.rfidStartScanning) {
+        if (request == Requests.start) {
             startScanning();
         }
-        else if (request == ZebraScanRequest.rfidStopScanning) {
+        else if (request == Requests.stop) {
             stopScanning();
         }
     }
 
-    public void track(ZebraScanRequest request, ArrayList<String> tags) {
+    public void track(Requests request, ArrayList<String> tags) {
 
-        if (request == ZebraScanRequest.rfidStartTracking) {
+        if (request == Requests.start) {
             startTracking(tags);
         }
-        else if (request == ZebraScanRequest.rfidStopTracking) {
+        else if (request == Requests.stop) {
             stopTracking();
         }
     }
@@ -450,7 +450,7 @@ public class ZebraRfid implements ZebraDevice, RfidEventsListener {
                 hashMap.put("tags",data);
 
                 // notify listener
-                sendEvent(ZebraEvents.readRfid,hashMap);
+                sendEvent(Events.readRfid,hashMap);
             }
         }
         catch (Exception e) {
@@ -469,7 +469,7 @@ public class ZebraRfid implements ZebraDevice, RfidEventsListener {
                 Log.d(TAG, "START SCANNNING");
 
                 // notify listener
-                sendEvent(ZebraEvents.startRead,new HashMap<>());
+                sendEvent(Events.startRead,new HashMap<>());
 
                 reader.Actions.Inventory.stop();
                 reader.Actions.Inventory.perform();
@@ -493,7 +493,7 @@ public class ZebraRfid implements ZebraDevice, RfidEventsListener {
                 Log.d(TAG, "STOP SCANNING. Found " + tags.size() + " tags");
 
                 // notify listener
-                sendEvent(ZebraEvents.stopRead,new HashMap<>());
+                sendEvent(Events.stopRead,new HashMap<>());
 
                 // stop the reader
                 reader.Actions.Inventory.stop();
@@ -518,7 +518,7 @@ public class ZebraRfid implements ZebraDevice, RfidEventsListener {
                 Log.d(TAG, "STARTING TRACKING");
 
                 // notify listener
-                sendEvent(ZebraEvents.startRead,new HashMap<>());
+                sendEvent(Events.startRead,new HashMap<>());
 
                 // set tracking tags
                 tracking.addAll(tags);
@@ -551,7 +551,7 @@ public class ZebraRfid implements ZebraDevice, RfidEventsListener {
                 Log.d(TAG, "STOPPING TRACKING. Found " + tags.size() + " tags");
 
                 // notify listener
-                sendEvent(ZebraEvents.stopRead,new HashMap<>());
+                sendEvent(Events.stopRead,new HashMap<>());
 
                 // stop the reader
                 reader.Actions.Inventory.stop();
@@ -642,7 +642,7 @@ public class ZebraRfid implements ZebraDevice, RfidEventsListener {
             if (exception != null) {
                 ok = false;
                 Log.e(TAG, "Error writing tag epc: " + exception.getMessage());
-                sendEvent(ZebraEvents.writeFail, ZebraDevice.toError("Error writing tag epc", exception));
+                sendEvent(Events.writeFail, ZebraDevice.toError("Error writing tag epc", exception));
             }
             else epc = newEpc;
         }
@@ -653,7 +653,7 @@ public class ZebraRfid implements ZebraDevice, RfidEventsListener {
             if (exception != null) {
                 ok = false;
                 Log.e(TAG, "Error writing tag data: " + exception.getMessage());
-                sendEvent(ZebraEvents.writeFail, ZebraDevice.toError("Error writing tag data", exception));
+                sendEvent(Events.writeFail, ZebraDevice.toError("Error writing tag data", exception));
             }
             else data = "";
         }
@@ -664,7 +664,7 @@ public class ZebraRfid implements ZebraDevice, RfidEventsListener {
             if (exception != null) {
                 ok = false;
                 Log.e(TAG, "Error writing tag password: " + exception.getMessage());
-                sendEvent(ZebraEvents.writeFail, ZebraDevice.toError("Error writing tag password", exception));
+                sendEvent(Events.writeFail, ZebraDevice.toError("Error writing tag password", exception));
             }
             else password = newPassword;
         }
@@ -676,7 +676,7 @@ public class ZebraRfid implements ZebraDevice, RfidEventsListener {
             tag.memoryBankData = data;
             tag.password = password;
             hashMap.put("tag",tag);
-            sendEvent(ZebraEvents.writeSuccess, hashMap);
+            sendEvent(Events.writeSuccess, hashMap);
         }
     }
 
@@ -710,7 +710,7 @@ public class ZebraRfid implements ZebraDevice, RfidEventsListener {
         }
     }
 
-    private void sendEvent(final ZebraDevice.ZebraEvents event, final HashMap map) {
+    private void sendEvent(final ZebraDevice.Events event, final HashMap map) {
 
         if (sink == null) Log.e(TAG, "Can't send notification to flutter. Sink is null");
         try

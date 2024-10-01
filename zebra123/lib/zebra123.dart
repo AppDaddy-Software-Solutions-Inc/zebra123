@@ -3,20 +3,20 @@ import 'package:collection/collection.dart';
 import 'package:zebra123/zebra_bridge.dart';
 
 typedef Callback = void Function(
-    ZebraInterfaces interface, ZebraEvents event, dynamic data);
+    Interfaces interface, Events event, dynamic data);
 
 /// Zebra RFID and DataWedge Interface
 class Zebra123 {
   late final ZebraBridge _bridge;
   late final Callback _callback;
 
-  ZebraConnectionStatus _connectionStatus = ZebraConnectionStatus.unknown;
-  ZebraConnectionStatus get connectionStatus {
+  Status _connectionStatus = Status.unknown;
+  Status get connectionStatus {
     // if listening return zebra bridge connection status
-    if (ZebraBridge.listeners.contains(this)) return _bridge.connectionStatus;
+    if (_bridge.contains(this)) return _bridge.status;
 
     // otherwise return disconnected
-    return ZebraConnectionStatus.disconnected;
+    return Status.disconnected;
   }
 
   Zebra123({required callback}) {
@@ -25,52 +25,51 @@ class Zebra123 {
   }
 
   // supports the zebra specified interface?
-  bool supports(ZebraInterfaces interface) =>
-      ZebraBridge.support.contains(interface);
+  bool supports(Interfaces interface) => _bridge.supports(interface);
 
   // listen for zebra events
   Future connect() async {
-    if (!ZebraBridge.listeners.contains(this)) {
+    if (!_bridge.contains(this)) {
       _bridge.addListener(this);
-      _callback(_bridge.interface, ZebraEvents.connectionStatus,
+      _callback(_bridge.interface, Events.connectionStatus,
           ConnectionStatus(status: connectionStatus));
     }
   }
 
   // stop listening to zebra events
   Future disconnect() async {
-    if (ZebraBridge.listeners.contains(this)) {
+    if (_bridge.contains(this)) {
       _bridge.removeListener(this);
-      _callback(_bridge.interface, ZebraEvents.connectionStatus,
-          ConnectionStatus(status: ZebraConnectionStatus.disconnected));
+      _callback(_bridge.interface, Events.connectionStatus,
+          ConnectionStatus(status: Status.disconnected));
     }
   }
 
   // start scanning for rfid tags
   Future startScanning() async {
-    if (ZebraBridge.listeners.contains(this)) {
-      _bridge.scan(ZebraScanRequest.rfidStartScanning);
+    if (_bridge.contains(this)) {
+      _bridge.scan(Requests.start);
     }
   }
 
   // stop scanning for rfid tags
   Future stopScanning() async {
-    if (ZebraBridge.listeners.contains(this)) {
-      _bridge.scan(ZebraScanRequest.rfidStopScanning);
+    if (_bridge.contains(this)) {
+      _bridge.scan(Requests.stop);
     }
   }
 
   // start rfid tag tracking
   Future startTracking(List<String> tags) async {
-    if (ZebraBridge.listeners.contains(this)) {
-      _bridge.track(ZebraScanRequest.rfidStartTracking, tags: tags);
+    if (_bridge.contains(this)) {
+      _bridge.track(Requests.start, tags: tags);
     }
   }
 
   // stop rfid tag tracking
   Future stopTracking() async {
-    if (ZebraBridge.listeners.contains(this)) {
-      _bridge.track(ZebraScanRequest.rfidStopTracking);
+    if (_bridge.contains(this)) {
+      _bridge.track(Requests.stop);
     }
   }
 
@@ -88,7 +87,7 @@ class Zebra123 {
   }
 
   // zebra event callback handler
-  void callback(ZebraInterfaces interface, ZebraEvents event, dynamic data) {
+  void callback(Interfaces interface, Events event, dynamic data) {
     // only report back changes in connection status on change
     if (data is ConnectionStatus) {
       if (data.status != _connectionStatus) {
@@ -122,7 +121,7 @@ class RfidTag {
   String? password;
   String? passwordNew;
 
-  ZebraInterfaces interface;
+  Interfaces interface;
 
   RfidTag(
       {required this.epc,
@@ -146,8 +145,8 @@ class RfidTag {
       lockData: map['lockData'] ?? '',
       size: map['size']?.toInt() ?? 0,
       seen: map['seen'] ?? '',
-      interface: toEnumerable(map['eventSource'], ZebraInterfaces.values) ??
-          ZebraInterfaces.unknown,
+      interface: toEnumerable(map['eventSource'], Interfaces.values) ??
+          Interfaces.unknown,
     );
   }
 }
@@ -157,7 +156,7 @@ class Barcode {
   String barcode;
   String format;
   String seen;
-  ZebraInterfaces interface;
+  Interfaces interface;
 
   Barcode(
       {required this.barcode,
@@ -171,15 +170,15 @@ class Barcode {
       barcode: map['barcode'] ?? '',
       format: map['format'] ?? '',
       seen: map['seen'] ?? '',
-      interface: toEnumerable(map['eventSource'], ZebraInterfaces.values) ??
-          ZebraInterfaces.unknown,
+      interface: toEnumerable(map['eventSource'], Interfaces.values) ??
+          Interfaces.unknown,
     );
   }
 }
 
 /// connection status class holds the rfid tag data
 class ConnectionStatus {
-  ZebraConnectionStatus status = ZebraConnectionStatus.unknown;
+  Status status = Status.unknown;
 
   ConnectionStatus({
     required this.status,
@@ -188,8 +187,8 @@ class ConnectionStatus {
   // create a connection status from a map
   factory ConnectionStatus.fromMap(Map<String, dynamic> map) {
     return ConnectionStatus(
-      status: toEnumerable(map['status'], ZebraConnectionStatus.values) ??
-          ZebraConnectionStatus.unknown,
+      status: toEnumerable(map['status'], Status.values) ??
+          Status.unknown,
     );
   }
 }
@@ -255,22 +254,19 @@ bool? toBool(dynamic s) {
 
 enum Mode { barcode, rfid }
 
-enum ZebraInterfaces {
+enum Interfaces {
   rfidapi3,
   datawedge,
   unknown
 }
 
-enum ZebraScanRequest {
-  rfidStartScanning,
-  rfidStopScanning,
-  rfidStartTracking,
-  rfidStopTracking,
-  write,
+enum Requests {
+  start,
+  stop,
   unknown
 }
 
-enum ZebraEvents {
+enum Events {
   readRfid,
   readBarcode,
   error,
@@ -283,7 +279,7 @@ enum ZebraEvents {
   unknown
 }
 
-enum ZebraConnectionStatus {
+enum Status {
   disconnected,
   connected,
   error,

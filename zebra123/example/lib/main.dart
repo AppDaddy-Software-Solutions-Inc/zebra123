@@ -17,8 +17,8 @@ class MyApp extends StatefulWidget {
 
 class _MyAppState extends State<MyApp> {
   Zebra123? zebra123;
-  ZebraInterfaces interface = ZebraInterfaces.unknown;
-  ZebraConnectionStatus connectionStatus = ZebraConnectionStatus.disconnected;
+  Interfaces interface = Interfaces.unknown;
+  Status connectionStatus = Status.disconnected;
   List<Barcode> barcodes = [];
 
   List<RfidTag> tags = [];
@@ -78,7 +78,7 @@ class _MyAppState extends State<MyApp> {
     var pad = const Padding(padding: EdgeInsets.only(left: 10));
 
     Widget connectBtn;
-    if (zebra123?.connectionStatus == ZebraConnectionStatus.connected) {
+    if (zebra123?.connectionStatus == Status.connected) {
       connectBtn = FloatingActionButton(
           backgroundColor: Colors.lightGreenAccent,
           onPressed: () => zebra123?.disconnect(),
@@ -96,8 +96,7 @@ class _MyAppState extends State<MyApp> {
         child: SizedBox(width: 100, height: 50, child: connectBtn));
 
     Widget scanBtn = const Offstage();
-    if (interface == ZebraInterfaces.rfidapi3 &&
-        zebra123?.connectionStatus == ZebraConnectionStatus.connected &&
+    if (zebra123?.connectionStatus == Status.connected &&
         !scanning &&
         !tracking) {
       scanBtn = FloatingActionButton(
@@ -111,7 +110,7 @@ class _MyAppState extends State<MyApp> {
     }
 
     Widget stopBtn = const Offstage();
-    if (interface == ZebraInterfaces.rfidapi3 && (scanning || tracking)) {
+    if (scanning || tracking) {
       stopBtn = FloatingActionButton(
           backgroundColor: Colors.redAccent.shade100,
           onPressed: () => stop(),
@@ -202,12 +201,12 @@ class _MyAppState extends State<MyApp> {
       trackBtn = SizedBox(width: 100, height: 35, child: trackBtn);
 
       Widget t5 = Padding(
-          padding: EdgeInsets.only(top: 10),
+          padding: const EdgeInsets.only(top: 10),
           child: Row(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [writeBtn, pad, trackBtn]));
       if (tracking) {
-        t5 = Offstage();
+        t5 = const Offstage();
       }
 
       var subtitle = Column(
@@ -341,11 +340,11 @@ class _MyAppState extends State<MyApp> {
     );
   }
 
-  void callback(ZebraInterfaces interface, ZebraEvents event, dynamic data) {
+  void callback(Interfaces interface, Events event, dynamic data) {
     this.interface = interface;
 
     switch (event) {
-      case ZebraEvents.readBarcode:
+      case Events.readBarcode:
         barcodes.clear();
         if (data is List<Barcode>) {
           for (Barcode barcode in data) {
@@ -356,10 +355,11 @@ class _MyAppState extends State<MyApp> {
             }
           }
         }
+        if (interface == Interfaces.datawedge && scanning) scanning = false;
         setState(() {});
         break;
 
-      case ZebraEvents.readRfid:
+      case Events.readRfid:
         tags.clear();
         if (data is List<RfidTag>) {
           for (RfidTag tag in data) {
@@ -370,16 +370,17 @@ class _MyAppState extends State<MyApp> {
             }
           }
         }
+        if (interface == Interfaces.datawedge && scanning) scanning = false;
         setState(() {});
         break;
 
-      case ZebraEvents.error:
+      case Events.error:
         if (data is Error) {
           if (kDebugMode) print("Interface: $interface Error: ${data.message}");
         }
         break;
 
-      case ZebraEvents.connectionStatus:
+      case Events.connectionStatus:
         if (data is ConnectionStatus) {
           if (kDebugMode) {
             print("Interface: $interface ConnectionStatus: ${data.status}");

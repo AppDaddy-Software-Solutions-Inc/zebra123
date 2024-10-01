@@ -8,32 +8,30 @@ public interface ZebraDevice {
     void connect();
     void disconnect();
     void dispose();
-    void scan(ZebraScanRequest request);
-    void track(ZebraScanRequest request, ArrayList<String> tags);
+    void scan(Requests request);
+    void track(Requests request, ArrayList<String> tags);
     void write(String epc, String newEpc, String password, String newPassword, String data);
 
-    enum ZebraInterfaces {
+    enum Interfaces {
         rfidapi3,
         datawedge,
         unknown
     }
 
-    enum ZebraMethods {
+    enum Methods {
         track,
         scan,
         write,
         unknown
     }
 
-    enum ZebraScanRequest {
-        rfidStartScanning,
-        rfidStopScanning,
-        rfidStartTracking,
-        rfidStopTracking,
+    enum Requests {
+        start,
+        stop,
         unknown
     }
 
-    enum ZebraEvents {
+    enum Events {
         readRfid,
         readBarcode,
         error,
