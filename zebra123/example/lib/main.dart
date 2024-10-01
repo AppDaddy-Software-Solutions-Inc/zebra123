@@ -37,6 +37,7 @@ class _MyAppState extends State<MyApp> {
 
   void startScanning() {
     zebra123?.startScanning();
+    tags.clear();
     setState(() {
       scanning = true;
       tracking = false;

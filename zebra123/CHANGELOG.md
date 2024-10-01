@@ -94,3 +94,9 @@
 ## 2.0.2
 
 * datawedge barcode reads happen 2x. Added filter where duplicate barcode detected within 1 second doesnt notify.
+
+## 3.0.0
+
+* fixed datawedge barcode reads happen 2x. 
+* fixed scanner reinitialization issue when application is paused
+* added soft scan for data wedge

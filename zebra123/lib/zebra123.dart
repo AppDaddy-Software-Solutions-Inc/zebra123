@@ -1,13 +1,19 @@
+export 'zebra123.dart' show Zebra123;
+export 'enums.dart';
+export 'classes.dart';
+
 import 'dart:async';
-import 'package:collection/collection.dart';
-import 'package:zebra123/zebra_bridge.dart';
+import 'classes.dart';
+import 'helpers.dart';
+import 'bridge.dart';
+import 'enums.dart';
 
 typedef Callback = void Function(
     Interfaces interface, Events event, dynamic data);
 
 /// Zebra RFID and DataWedge Interface
 class Zebra123 {
-  late final ZebraBridge _bridge;
+  late final Bridge _bridge;
   late final Callback _callback;
 
   Status _connectionStatus = Status.unknown;
@@ -21,7 +27,7 @@ class Zebra123 {
 
   Zebra123({required callback}) {
     _callback = callback;
-    _bridge = ZebraBridge(listener: this);
+    _bridge = Bridge(listener: this);
   }
 
   // supports the zebra specified interface?
@@ -145,143 +151,8 @@ class RfidTag {
       lockData: map['lockData'] ?? '',
       size: map['size']?.toInt() ?? 0,
       seen: map['seen'] ?? '',
-      interface: toEnumerable(map['eventSource'], Interfaces.values) ??
-          Interfaces.unknown,
+      interface:
+          toEnum(map['eventSource'], Interfaces.values) ?? Interfaces.unknown,
     );
   }
-}
-
-/// barcode class holds the rfid tag data
-class Barcode {
-  String barcode;
-  String format;
-  String seen;
-  Interfaces interface;
-
-  Barcode(
-      {required this.barcode,
-      required this.format,
-      required this.seen,
-      required this.interface});
-
-  /// create a barcode from a map
-  factory Barcode.fromMap(Map<String, dynamic> map) {
-    return Barcode(
-      barcode: map['barcode'] ?? '',
-      format: map['format'] ?? '',
-      seen: map['seen'] ?? '',
-      interface: toEnumerable(map['eventSource'], Interfaces.values) ??
-          Interfaces.unknown,
-    );
-  }
-}
-
-/// connection status class holds the rfid tag data
-class ConnectionStatus {
-  Status status = Status.unknown;
-
-  ConnectionStatus({
-    required this.status,
-  });
-
-  // create a connection status from a map
-  factory ConnectionStatus.fromMap(Map<String, dynamic> map) {
-    return ConnectionStatus(
-      status: toEnumerable(map['status'], Status.values) ??
-          Status.unknown,
-    );
-  }
-}
-
-class Error {
-  String source = "";
-  String message = "";
-  String trace = "";
-
-  Error({
-    required this.source,
-    required this.message,
-    required this.trace,
-  });
-
-  Map<String, dynamic> toMap() {
-    return {
-      'source': source,
-      'message': message,
-      'trace': trace,
-    };
-  }
-
-  factory Error.fromMap(Map<String, dynamic> map) {
-    return Error(
-      source: map['source'] ?? "",
-      message: map['message'] ?? "",
-      trace: map['trace'] ?? "",
-    );
-  }
-}
-
-/// Returns a String name given an Enum Type
-String? fromEnumerable(Object? e) {
-  try {
-    return e.toString().split('.').last;
-  } catch (e) {
-    return null;
-  }
-}
-
-/// Returns an Enum Type given a String name
-T? toEnumerable<T>(String? key, List<T> values) {
-  try {
-    return values.firstWhereOrNull((v) => key == fromEnumerable(v));
-  } catch (e) {
-    return null;
-  }
-}
-
-bool? toBool(dynamic s) {
-  try {
-    if (s == null) return null;
-    if (s is bool) return s;
-    s = s.toString().trim().toLowerCase();
-    if (s == "true") return true;
-    if (s == "false") return false;
-    return null;
-  } catch (e) {
-    return null;
-  }
-}
-
-enum Mode { barcode, rfid }
-
-enum Interfaces {
-  rfidapi3,
-  datawedge,
-  unknown
-}
-
-enum Requests {
-  start,
-  stop,
-  unknown
-}
-
-enum Events {
-  readRfid,
-  readBarcode,
-  error,
-  connectionStatus,
-  support,
-  startRead,
-  stopRead,
-  writeFail,
-  writeSuccess,
-  unknown
-}
-
-enum Status {
-  disconnected,
-  connected,
-  error,
-  unknown
 }

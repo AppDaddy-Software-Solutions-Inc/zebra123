@@ -53,9 +53,9 @@ public class ZebraRfid implements ZebraDevice, RfidEventsListener {
 
     private static final Interfaces INTERFACE = Interfaces.rfidapi3;
 
-    Context context;
+    private Handler handler;
+    private Context context;
     private EventSink sink = null;
-
     private RFIDReader reader;
 
     // holds a list of tags read
@@ -67,6 +67,7 @@ public class ZebraRfid implements ZebraDevice, RfidEventsListener {
     ZebraRfid(Context context, EventSink sink) {
         this.context = context;
         this.sink = sink;
+        handler = new Handler(Looper.getMainLooper());
     }
 
     public static boolean isSupported(Context context) {
@@ -712,17 +713,24 @@ public class ZebraRfid implements ZebraDevice, RfidEventsListener {
 
     private void sendEvent(final ZebraDevice.Events event, final HashMap map) {
 
-        if (sink == null) Log.e(TAG, "Can't send notification to flutter. Sink is null");
-        try
-        {
-            map.put("eventSource", INTERFACE.toString());
-            map.put("eventName", event.toString());
-            sink.success(map);
+        if (sink == null) {
+            Log.e(TAG, "Can't send notification to flutter. Sink is null");
+            return;
         }
-        catch (Exception e)
-        {
-            Log.e(TAG, "Error sending notification to flutter. Error: " + e.getMessage());
-        }
+
+        // we need to send this on the main thread
+        handler.post(() -> {
+            try
+            {
+                map.put("eventSource", INTERFACE.toString());
+                map.put("eventName", event.toString());
+                sink.success(map);
+            }
+            catch (Exception e)
+            {
+                Log.e(TAG, "Error sending notification to flutter. Error: " + e.getMessage());
+            }
+        });
     }
 
     //Entity class transfer HashMap

@@ -190,7 +190,11 @@ public class Zebra123 implements FlutterPlugin, MethodCallHandler, StreamHandler
 
   public void sendEvent(final EventSink sink, final ZebraDevice.Events event, final HashMap map) {
 
-    if (sink == null) Log.e(TAG, "Can't send notification to flutter. Sink is null");
+    if (sink == null) {
+      Log.e(TAG, "Can't send notification to flutter. Sink is null");
+      return;
+    }
+
     try
     {
       map.put("eventSource", INTERFACE.toString());

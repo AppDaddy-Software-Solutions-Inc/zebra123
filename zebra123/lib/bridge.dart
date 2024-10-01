@@ -1,11 +1,11 @@
-import 'dart:async';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 import 'package:zebra123/zebra123.dart';
 
-/// bridge between flutter and android.
-class ZebraBridge {
+import 'helpers.dart';
 
+/// bridge between flutter and android.
+class Bridge {
   var _interface = Interfaces.unknown;
   Interfaces get interface => _interface;
 
@@ -18,35 +18,33 @@ class ZebraBridge {
   bool supports(Interfaces interface) => _supported.contains(interface);
 
   late final MethodChannel _methodChannel;
-  late final EventChannel  _eventChannel;
-  late final StreamSubscription<dynamic>? _sink;
+  late final EventChannel _eventChannel;
 
-  static ZebraBridge? _singleton;
+  static Bridge? _singleton;
 
-  /// Constructs a singleton instance of [ZebraBridge].
+  /// Constructs a singleton instance of [Bridge].
   ///
-  /// [ZebraBridge] is designed to work as a singleton.
+  /// [Bridge] is designed to work as a singleton.
   // When a second instance is created, the first instance will not be able to listen to the
   // EventChannel because it is overridden. Forcing the class to be a singleton class can prevent
   // misuse of creating a second instance from a programmer.
-  factory ZebraBridge({Zebra123? listener}) {
-    _singleton ??= ZebraBridge._();
+  factory Bridge({Zebra123? listener}) {
+    _singleton ??= Bridge._();
     if (listener != null) {
       _singleton!.addListener(listener);
     }
     return _singleton!;
   }
 
-  ZebraBridge._()
-  {
+  Bridge._() {
     // create method channel
     _methodChannel = const MethodChannel("dev.fml.zebra123/method");
 
     // create event channel
-    _eventChannel  = const EventChannel("dev.fml.zebra123/event");
+    _eventChannel = const EventChannel("dev.fml.zebra123/event");
 
     // listen for events
-    _sink = _eventChannel.receiveBroadcastStream().listen(_eventListener);
+    _eventChannel.receiveBroadcastStream().listen(_eventListener);
   }
 
   // returns true is specified listener is ion the _listener list
@@ -68,7 +66,7 @@ class ZebraBridge {
 
   // invoke scan request
   void scan(Requests request) {
-    _methodChannel.invokeMethod("scan", {"request": fromEnumerable(request)});
+    _methodChannel.invokeMethod("scan", {"request": fromEnum(request)});
   }
 
   // invoke tracking request
@@ -81,8 +79,8 @@ class ZebraBridge {
         list += ",$tag";
       }
     }
-    _methodChannel.invokeMethod(
-        "track", {"request": fromEnumerable(request), "tags": list});
+    _methodChannel
+        .invokeMethod("track", {"request": fromEnum(request), "tags": list});
   }
 
   // invoke write request
@@ -100,14 +98,11 @@ class ZebraBridge {
   // zebra events listener
   void _eventListener(dynamic payload) {
     try {
-
       final map = Map<String, dynamic>.from(payload);
       _interface =
-          toEnumerable(map['eventSource'] as String, Interfaces.values) ??
-              _interface;
+          toEnum(map['eventSource'] as String, Interfaces.values) ?? _interface;
       final event =
-          toEnumerable(map['eventName'] as String, Events.values) ??
-              Events.unknown;
+          toEnum(map['eventName'] as String, Events.values) ?? Events.unknown;
 
       switch (event) {
         case Events.readRfid:
@@ -115,7 +110,7 @@ class ZebraBridge {
           List<dynamic> tags = map["tags"];
           for (var i = 0; i < tags.length; i++) {
             var tag = Map<String, dynamic>.from(tags[i]);
-            tag["eventSource"] = fromEnumerable(_interface);
+            tag["eventSource"] = fromEnum(_interface);
             list.add(RfidTag.fromMap(tag));
           }
 
@@ -157,16 +152,14 @@ class ZebraBridge {
           break;
 
         case Events.support:
-          if (map.containsKey(fromEnumerable(Interfaces.rfidapi3))) {
-            var supports =
-                toBool(map[fromEnumerable(Interfaces.rfidapi3)]) ?? false;
+          if (map.containsKey(fromEnum(Interfaces.rfidapi3))) {
+            var supports = toBool(map[fromEnum(Interfaces.rfidapi3)]) ?? false;
             if (supports && !_supported.contains(Interfaces.rfidapi3)) {
               _supported.add(Interfaces.rfidapi3);
             }
           }
-          if (map.containsKey(fromEnumerable(Interfaces.datawedge))) {
-            var supports =
-                toBool(map[fromEnumerable(Interfaces.datawedge)]) ?? false;
+          if (map.containsKey(fromEnum(Interfaces.datawedge))) {
+            var supports = toBool(map[fromEnum(Interfaces.datawedge)]) ?? false;
             if (supports && !_supported.contains(Interfaces.datawedge)) {
               _supported.add(Interfaces.datawedge);
             }
@@ -196,7 +189,7 @@ class ZebraBridge {
 
         // unknown event
         default:
-        // notify listeners
+          // notify listeners
           for (var listener in _listeners) {
             listener.callback(_interface, event, null);
           }
