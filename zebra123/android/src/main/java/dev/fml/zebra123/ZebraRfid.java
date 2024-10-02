@@ -49,7 +49,7 @@ import io.flutter.plugin.common.EventChannel.EventSink;
 
 public class ZebraRfid implements ZebraDevice, RfidEventsListener {
 
-    private static final String TAG = "zebra123";
+    private static String TAG = "zebra123";
 
     private static final Interfaces INTERFACE = Interfaces.rfidapi3;
 
@@ -65,6 +65,9 @@ public class ZebraRfid implements ZebraDevice, RfidEventsListener {
     private ArrayList<String> tracking = new ArrayList<>();
 
     ZebraRfid(Context context, EventSink sink) {
+
+        TAG = context.getPackageName() + "." + "zebra123";
+
         this.context = context;
         this.sink = sink;
         handler = new Handler(Looper.getMainLooper());

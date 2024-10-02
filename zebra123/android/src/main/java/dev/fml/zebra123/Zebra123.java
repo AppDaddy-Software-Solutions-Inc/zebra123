@@ -22,8 +22,7 @@ import io.flutter.plugin.common.MethodChannel.Result;
 /** Zebra123 */
 public class Zebra123 implements FlutterPlugin, MethodCallHandler, StreamHandler {
 
-  public  final static String PLUGIN = "zebra123";
-  private final static String TAG = PLUGIN;
+  private static String TAG = "zebra123";
 
   private static final ZebraDevice.Interfaces INTERFACE = ZebraDevice.Interfaces.unknown;
 
@@ -44,6 +43,8 @@ public class Zebra123 implements FlutterPlugin, MethodCallHandler, StreamHandler
   public void onAttachedToEngine(@NonNull FlutterPluginBinding flutterPluginBinding) {
 
     context = flutterPluginBinding.getApplicationContext();
+
+    TAG = context.getPackageName() + "." + "zebra123";
 
     //if (methodHandler != null) methodHandler.setMethodCallHandler(null);
     methodHandler = new MethodChannel(flutterPluginBinding.getBinaryMessenger(), METHODCHANNEL);

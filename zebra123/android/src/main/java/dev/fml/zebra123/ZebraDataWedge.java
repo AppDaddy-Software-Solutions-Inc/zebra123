@@ -21,9 +21,8 @@ import io.flutter.plugin.common.EventChannel.EventSink;
 
 public class ZebraDataWedge extends BroadcastReceiver implements ZebraDevice {
 
-    private static final String TAG = "zebra123";
-
     private static final Interfaces INTERFACE = Interfaces.datawedge;
+    private static String TAG = "zebra123";
 
     private Context context;
     private EventSink sink = null;
@@ -31,28 +30,16 @@ public class ZebraDataWedge extends BroadcastReceiver implements ZebraDevice {
     public static String barcodeLast = "";
     public static long seenLast = 0;
 
-    public static final String PROFILE_INTENT_ACTION = TAG;
-    public static final String PROFILE_INTENT_BROADCAST = "2";
-    public static final String DATAWEDGE_SEND_ACTION = "com.symbol.datawedge.api.ACTION";
-    public static final String DATAWEDGE_RETURN_ACTION = "com.symbol.datawedge.api.RESULT_ACTION";
-    public static final String DATAWEDGE_RETURN_CATEGORY = "android.intent.category.DEFAULT";
-    public static final String DATAWEDGE_EXTRA_SEND_RESULT = "SEND_RESULT";
-    public static final String DATAWEDGE_SCAN_EXTRA_DATA_STRING = "com.symbol.datawedge.data_string";
-    public static final String DATAWEDGE_SCAN_EXTRA_SOURCE = "com.symbol.datawedge.source";
-    public static final String DATAWEDGE_SCAN_EXTRA_LABEL_TYPE = "com.symbol.datawedge.label_type";
-    public static final String DATAWEDGE_SEND_CREATE_PROFILE = "com.symbol.datawedge.api.CREATE_PROFILE";
-    public static final String DATAWEDGE_SEND_SET_CONFIG = "com.symbol.datawedge.api.SET_CONFIG";
-    public static final String DATAWEDGE_SEND_SCANNER_COMMAND = "com.symbol.datawedge.api.SCANNER_INPUT_PLUGIN";
+    private static String pkage = "";
 
     public ZebraDataWedge(Context context, EventSink sink) {
-
+        TAG = context.getPackageName() + "." + "zebra123";
         this.context = context;
         this.sink = sink;
         this.createProfile();
     }
 
     public static boolean isSupported(Context context) {
-
         try {
             String deviceName = Build.MANUFACTURER;
 
@@ -71,7 +58,7 @@ public class ZebraDataWedge extends BroadcastReceiver implements ZebraDevice {
     @Override
     public void onReceive(Context context, Intent intent) {
         String action = intent.getAction();
-        if (action.equals(TAG)) {
+        if (action.equals(context.getPackageName())) {
             try {
                 String barcode = intent.getStringExtra("com.symbol.datawedge.data_string");
                 String format  = intent.getStringExtra("com.symbol.datawedge.label_type");
@@ -105,20 +92,31 @@ public class ZebraDataWedge extends BroadcastReceiver implements ZebraDevice {
     }
 
     private void sendCommandString(@NotNull String command, @NotNull String parameter, boolean sendResult) {
-        Intent dwIntent = new Intent();
-        dwIntent.setAction("com.symbol.datawedge.api.ACTION");
-        dwIntent.putExtra(command, parameter);
-        if (sendResult) {
-            dwIntent.putExtra("SEND_RESULT", "true");
+        try {
+            Intent dwIntent = new Intent();
+            dwIntent.setAction("com.symbol.datawedge.api.ACTION");
+            dwIntent.putExtra(command, parameter);
+            if (sendResult) {
+                dwIntent.putExtra("SEND_RESULT", "true");
+            }
+            context.sendBroadcast(dwIntent);
         }
-        this.context.sendBroadcast(dwIntent);
+        catch (Exception e) {
+            Log.e(TAG, "Error sending command to device" + e.getMessage());
+        }
     }
 
     private void sendCommandBundle(@NotNull String command, @NotNull Bundle parameter) {
-        Intent dwIntent = new Intent();
-        dwIntent.setAction("com.symbol.datawedge.api.ACTION");
-        dwIntent.putExtra(command, parameter);
-        this.context.sendBroadcast(dwIntent);
+
+        try {
+            Intent dwIntent = new Intent();
+            dwIntent.setAction("com.symbol.datawedge.api.ACTION");
+            dwIntent.putExtra(command, parameter);
+            context.sendBroadcast(dwIntent);
+        }
+        catch (Exception e) {
+            Log.e(TAG, "Error sending command to device" + e.getMessage());
+        }
     }
 
     @Override
@@ -131,7 +129,7 @@ public class ZebraDataWedge extends BroadcastReceiver implements ZebraDevice {
             filter.addAction("com.symbol.datawedge.api.ACTION");
             filter.addAction("com.symbol.datawedge.api.NOTIFICATION_ACTION");
             filter.addCategory(Intent.CATEGORY_DEFAULT);
-            filter.addAction(TAG); // Please use this String in your DataWedge profile configuration
+            filter.addAction(context.getPackageName()); // Please use this String in your DataWedge profile configuration
 
             context.registerReceiver(this, filter);
 
@@ -142,6 +140,7 @@ public class ZebraDataWedge extends BroadcastReceiver implements ZebraDevice {
             sendEvent(Events.connectionStatus,map);
         }
         catch(Exception e) {
+
             Log.e(TAG, "Error connecting to device" + e.getMessage());
             sendEvent(Events.error, ZebraDevice.toError("connect()", e));
         }
@@ -167,7 +166,13 @@ public class ZebraDataWedge extends BroadcastReceiver implements ZebraDevice {
 
     @Override
     public void dispose() {
-        context.unregisterReceiver(this);
+        try {
+            context.unregisterReceiver(this);
+        }
+        catch(Exception e)
+        {
+            Log.e(TAG, "Error during dispose()." + e.getMessage());
+        }
     }
 
     @Override
@@ -177,9 +182,6 @@ public class ZebraDataWedge extends BroadcastReceiver implements ZebraDevice {
         String parameter = request == Requests.start ? "START_SCANNING" : "STOP_SCANNING";
         String command   = "com.symbol.datawedge.api.SOFT_SCAN_TRIGGER";
         sendCommandString(command, parameter, false);
-
-        //Exception exception = new Exception("Not implemented");
-        //sendEvent(Events.error, ZebraDevice.toError("Error writing tag data", exception));
         return;
     }
 
@@ -205,80 +207,83 @@ public class ZebraDataWedge extends BroadcastReceiver implements ZebraDevice {
 
     private void createProfile() {
 
-        String profile = context.getPackageName() + "." + TAG;
+        try {
+            // create the profile if it doesnt exist
+            sendCommandString("com.symbol.datawedge.api.CREATE_PROFILE", context.getPackageName(), false);
 
-        // create the profile if it doesnt exist
-        sendCommandString("com.symbol.datawedge.api.CREATE_PROFILE", profile, false);
+            Bundle dwProfile = new Bundle();
+            dwProfile.putString("PROFILE_NAME", context.getPackageName());
+            dwProfile.putString("PROFILE_ENABLED", "true");
+            dwProfile.putString("CONFIG_MODE", "UPDATE");
 
-        Bundle dwProfile = new Bundle();
-        dwProfile.putString("PROFILE_NAME", profile);
-        dwProfile.putString("PROFILE_ENABLED", "true");
-        dwProfile.putString("CONFIG_MODE", "UPDATE");
+            Bundle appConfig = new Bundle();
+            appConfig.putString("PACKAGE_NAME", context.getPackageName());
 
-        Bundle appConfig = new Bundle();
-        appConfig.putString("PACKAGE_NAME", context.getPackageName());
+            String[] var4 = new String[]{"*"};
+            appConfig.putStringArray("ACTIVITY_LIST", var4);
+            Bundle[] var13 = new Bundle[]{appConfig};
 
-        String[] var4 = new String[]{"*"};
-        appConfig.putStringArray("ACTIVITY_LIST", var4);
-        Bundle[] var13 = new Bundle[]{appConfig};
+            dwProfile.putParcelableArray("APP_LIST", (Parcelable[])var13);
 
-        dwProfile.putParcelableArray("APP_LIST", (Parcelable[])var13);
+            ArrayList plugins = new ArrayList();
 
-        ArrayList plugins = new ArrayList();
+            Bundle intentPluginProperyties = new Bundle();
+            intentPluginProperyties.putString("intent_output_enabled", "true");
+            intentPluginProperyties.putString("intent_action", context.getPackageName());
+            intentPluginProperyties.putString("intent_delivery", "2");
 
-        Bundle intentPluginProperyties = new Bundle();
-        intentPluginProperyties.putString("intent_output_enabled", "true");
-        intentPluginProperyties.putString("intent_action", TAG);
-        intentPluginProperyties.putString("intent_delivery", "2");
+            Bundle intentPlugin = new Bundle();
+            intentPlugin.putString("PLUGIN_NAME", "INTENT");
+            intentPlugin.putString("RESET_CONFIG", "true");
+            intentPlugin.putBundle("PARAM_LIST", intentPluginProperyties);
+            plugins.add(intentPlugin);
 
-        Bundle intentPlugin = new Bundle();
-        intentPlugin.putString("PLUGIN_NAME", "INTENT");
-        intentPlugin.putString("RESET_CONFIG", "true");
-        intentPlugin.putBundle("PARAM_LIST", intentPluginProperyties);
-        plugins.add(intentPlugin);
+            Bundle barcodePluginProperties = new Bundle();
+            barcodePluginProperties.putString("scanner_input_enabled", "true");
+            barcodePluginProperties.putString("scanner_selection", "auto");
+            Bundle barcodePlugin = new Bundle();
+            barcodePlugin.putString("PLUGIN_NAME", "BARCODE");
+            barcodePlugin.putString("RESET_CONFIG", "true");
+            barcodePlugin.putBundle("PARAM_LIST", barcodePluginProperties);
+            plugins.add(barcodePlugin);
 
-        Bundle barcodePluginProperties = new Bundle();
-        barcodePluginProperties.putString("scanner_input_enabled", "true");
-        barcodePluginProperties.putString("scanner_selection", "auto");
-        Bundle barcodePlugin = new Bundle();
-        barcodePlugin.putString("PLUGIN_NAME", "BARCODE");
-        barcodePlugin.putString("RESET_CONFIG", "true");
-        barcodePlugin.putBundle("PARAM_LIST", barcodePluginProperties);
-        plugins.add(barcodePlugin);
+            Bundle rfidPluginProperties = new Bundle();
+            rfidPluginProperties.putString("rfid_input_enabled", "true");
+            rfidPluginProperties.putString("rfid_beeper_enable", "true");
+            rfidPluginProperties.putString("rfid_led_enable", "true");
+            rfidPluginProperties.putString("rfid_antenna_transmit_power", "30");
+            rfidPluginProperties.putString("rfid_memory_bank", "0");
+            rfidPluginProperties.putString("rfid_session", "1");
+            rfidPluginProperties.putString("rfid_trigger_mode", "0");
+            rfidPluginProperties.putString("rfid_filter_duplicate_tags", "true");
+            rfidPluginProperties.putString("rfid_hardware_trigger_enabled", "true");
+            rfidPluginProperties.putString("rfid_tag_read_duration", "1000");
+            rfidPluginProperties.putString("rfid_link_profile", "0");
+            rfidPluginProperties.putString("rfid_pre_filter_enable", "false");
+            rfidPluginProperties.putString("rfid_post_filter_enable", "false");
 
-        Bundle rfidPluginProperties = new Bundle();
-        rfidPluginProperties.putString("rfid_input_enabled", "true");
-        rfidPluginProperties.putString("rfid_beeper_enable", "true");
-        rfidPluginProperties.putString("rfid_led_enable", "true");
-        rfidPluginProperties.putString("rfid_antenna_transmit_power", "30");
-        rfidPluginProperties.putString("rfid_memory_bank", "0");
-        rfidPluginProperties.putString("rfid_session", "1");
-        rfidPluginProperties.putString("rfid_trigger_mode", "0");
-        rfidPluginProperties.putString("rfid_filter_duplicate_tags", "true");
-        rfidPluginProperties.putString("rfid_hardware_trigger_enabled", "true");
-        rfidPluginProperties.putString("rfid_tag_read_duration", "1000");
-        rfidPluginProperties.putString("rfid_link_profile", "0");
-        rfidPluginProperties.putString("rfid_pre_filter_enable", "false");
-        rfidPluginProperties.putString("rfid_post_filter_enable", "false");
+            Bundle rfidPlugin = new Bundle();
+            rfidPlugin.putString("PLUGIN_NAME", "RFID");
+            rfidPlugin.putString("RESET_CONFIG", "true");
+            rfidPlugin.putBundle("PARAM_LIST", rfidPluginProperties);
+            plugins.add(rfidPlugin);
 
-        Bundle rfidPlugin = new Bundle();
-        rfidPlugin.putString("PLUGIN_NAME", "RFID");
-        rfidPlugin.putString("RESET_CONFIG", "true");
-        rfidPlugin.putBundle("PARAM_LIST", rfidPluginProperties);
-        plugins.add(rfidPlugin);
+            Bundle keystrokePluginProperties = new Bundle();
+            keystrokePluginProperties.putString("keystroke_output_enabled", "false");
 
-        Bundle keystrokePluginProperties = new Bundle();
-        keystrokePluginProperties.putString("keystroke_output_enabled", "false");
+            Bundle keystrokePlugin = new Bundle();
+            keystrokePlugin.putString("PLUGIN_NAME", "KEYSTROKE");
+            keystrokePlugin.putString("RESET_CONFIG", "true");
+            keystrokePlugin.putBundle("PARAM_LIST", keystrokePluginProperties);
+            plugins.add(keystrokePlugin);
+            dwProfile.putParcelableArrayList("PLUGIN_CONFIG", plugins);
+            this.sendCommandBundle("com.symbol.datawedge.api.SET_CONFIG", dwProfile);
 
-        Bundle keystrokePlugin = new Bundle();
-        keystrokePlugin.putString("PLUGIN_NAME", "KEYSTROKE");
-        keystrokePlugin.putString("RESET_CONFIG", "true");
-        keystrokePlugin.putBundle("PARAM_LIST", keystrokePluginProperties);
-        plugins.add(keystrokePlugin);
-        dwProfile.putParcelableArrayList("PLUGIN_CONFIG", plugins);
-        this.sendCommandBundle("com.symbol.datawedge.api.SET_CONFIG", dwProfile);
-
-        sendCommandString("com.symbol.datawedge.api.SCANNER_INPUT_PLUGIN", "ENABLE_PLUGIN", false);
+            sendCommandString("com.symbol.datawedge.api.SCANNER_INPUT_PLUGIN", "ENABLE_PLUGIN", false);
+        }
+        catch (Exception e) {
+            Log.e(TAG, "Error creating profile" + e.getMessage());
+        }
     }
 
     private void sendEvent(final ZebraDevice.Events event, final HashMap map) {

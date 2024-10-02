@@ -108,3 +108,7 @@
 ## 3.0.2
 
 * fixed dart formatter issues 
+
+## 3.0.3
+
+* changed INTENT filter to use package name 
