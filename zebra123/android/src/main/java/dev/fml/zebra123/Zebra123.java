@@ -22,8 +22,6 @@ import io.flutter.plugin.common.MethodChannel.Result;
 /** Zebra123 */
 public class Zebra123 implements FlutterPlugin, MethodCallHandler, StreamHandler {
 
-  private static String TAG = "zebra123";
-
   private static final ZebraDevice.Interfaces INTERFACE = ZebraDevice.Interfaces.unknown;
 
   private MethodChannel methodHandler;
@@ -39,12 +37,21 @@ public class Zebra123 implements FlutterPlugin, MethodCallHandler, StreamHandler
   boolean supportsRfid = false;
   boolean supportsDatawedge = false;
 
+  // returns the intended intent action
+  public static String getPackageName(Context context) {
+    if (context == null) return "unknown";
+    return context.getPackageName();
+  }
+
+  // returns the intended intent action
+  public static String getTagName(Context context) {
+    return getPackageName(context) + ".ZEBRA";
+  }
+
   @Override
   public void onAttachedToEngine(@NonNull FlutterPluginBinding flutterPluginBinding) {
 
     context = flutterPluginBinding.getApplicationContext();
-
-    TAG = context.getPackageName() + "." + "zebra123";
 
     //if (methodHandler != null) methodHandler.setMethodCallHandler(null);
     methodHandler = new MethodChannel(flutterPluginBinding.getBinaryMessenger(), METHODCHANNEL);
@@ -98,6 +105,17 @@ public class Zebra123 implements FlutterPlugin, MethodCallHandler, StreamHandler
         }
         break;
 
+      case mode:
+        if (device != null) {
+          ZebraDevice.Modes mode = ZebraDevice.Modes.unknown;
+          try {
+            mode = ZebraDevice.Modes.valueOf(argument(call,"mode"));
+          }
+          catch(Exception e) {}
+          device.mode(mode);
+        }
+        break;
+
       case write:
         if (device != null) {
           String epc         = argument(call,"epc");
@@ -136,7 +154,8 @@ public class Zebra123 implements FlutterPlugin, MethodCallHandler, StreamHandler
 
   @Override
   public void onCancel(Object arguments) {
-    Log.w(TAG, "cancelling listener");
+
+    Log.w(getTagName(context), "cancelling listener");
   }
 
   String argument(MethodCall call, String key) {
@@ -178,7 +197,7 @@ public class Zebra123 implements FlutterPlugin, MethodCallHandler, StreamHandler
       }
     }
     catch(Exception e) {
-        Log.e(TAG, "Error connecting to device" + e.getMessage());
+        Log.e(getTagName(context), "Error connecting to device" + e.getMessage());
         sendEvent(sink, ZebraDevice.Events.error, ZebraDevice.toError("Error during connect()", e));
     }
   }
@@ -192,7 +211,7 @@ public class Zebra123 implements FlutterPlugin, MethodCallHandler, StreamHandler
   public void sendEvent(final EventSink sink, final ZebraDevice.Events event, final HashMap map) {
 
     if (sink == null) {
-      Log.e(TAG, "Can't send notification to flutter. Sink is null");
+      Log.e(getTagName(context), "Can't send notification to flutter. Sink is null");
       return;
     }
 
@@ -204,7 +223,7 @@ public class Zebra123 implements FlutterPlugin, MethodCallHandler, StreamHandler
     }
     catch (Exception e)
     {
-      Log.e(TAG, "Error sending notification to flutter. Error: " + e.getMessage());
+      Log.e(getTagName(context), "Error sending notification to flutter. Error: " + e.getMessage());
     }
   }
 }

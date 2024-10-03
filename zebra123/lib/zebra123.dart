@@ -82,6 +82,13 @@ class Zebra123 {
     }
   }
 
+  // stop rfid tag tracking
+  Future setMode(Modes mode) async {
+    if (_bridge.contains(this)) {
+      _bridge.mode(mode);
+    }
+  }
+
   // write rfid tag
   Future writeTag(String epc,
       {String? epcNew,

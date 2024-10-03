@@ -1,5 +1,5 @@
 /// zebra modes (not implemented)
-enum Mode { barcode, rfid }
+enum Modes { barcode, rfid }
 
 /// zebra device interfaces
 enum Interfaces { rfidapi3, datawedge, unknown }

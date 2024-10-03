@@ -64,6 +64,11 @@ class Bridge {
     }
   }
 
+  // set device mode
+  void mode(Modes mode) {
+    _methodChannel.invokeMethod("mode", {"mode": fromEnum(mode)});
+  }
+
   // invoke scan request
   void scan(Requests request) {
     _methodChannel.invokeMethod("scan", {"request": fromEnum(request)});

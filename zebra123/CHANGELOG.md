@@ -112,3 +112,11 @@
 ## 3.0.3
 
 * changed INTENT filter to use package name 
+
+## 3.1.0
+
+* added function to set device mode() to either barcode or rfid. This only applies for RFID capable devices.
+
+## 3.1.1
+
+* added function to set device mode() to either barcode or rfid. This only applies for RFID capable devices.

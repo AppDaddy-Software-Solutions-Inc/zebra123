@@ -49,8 +49,6 @@ import io.flutter.plugin.common.EventChannel.EventSink;
 
 public class ZebraRfid implements ZebraDevice, RfidEventsListener {
 
-    private static String TAG = "zebra123";
-
     private static final Interfaces INTERFACE = Interfaces.rfidapi3;
 
     private Handler handler;
@@ -65,9 +63,6 @@ public class ZebraRfid implements ZebraDevice, RfidEventsListener {
     private ArrayList<String> tracking = new ArrayList<>();
 
     ZebraRfid(Context context, EventSink sink) {
-
-        TAG = context.getPackageName() + "." + "zebra123";
-
         this.context = context;
         this.sink = sink;
         handler = new Handler(Looper.getMainLooper());
@@ -80,7 +75,7 @@ public class ZebraRfid implements ZebraDevice, RfidEventsListener {
             if (readers.GetAvailableRFIDReaderList().size() > 0) return true;
         }
         catch(Exception e) {
-            Log.d(TAG, "Reader does not support RFID");
+            Log.d(Zebra123.getTagName(context), "Reader does not support RFID");
         }
         return false;
     }
@@ -90,7 +85,7 @@ public class ZebraRfid implements ZebraDevice, RfidEventsListener {
 
             try {
 
-                Log.d(TAG, "ConfigureReader()");
+                Log.d(Zebra123.getTagName(context), "ConfigureReader()");
 
                 // receive events from reader
                 setEvents();
@@ -113,8 +108,8 @@ public class ZebraRfid implements ZebraDevice, RfidEventsListener {
                 // delete any prefilters
                 reader.Actions.PreFilters.deleteAll();
 
-            } catch (InvalidUsageException | OperationFailureException e) {
-                e.printStackTrace();
+            } catch (Exception e) {
+                Log.e(Zebra123.getTagName(context), "Error configuring reader. Error: " + e.getMessage());
             }
         }
     }
@@ -122,20 +117,20 @@ public class ZebraRfid implements ZebraDevice, RfidEventsListener {
     private void setRegulatoryConfig() {
 
         try {
-        if (reader != null) {
-            Log.e(TAG,"Setting region");
+            if (reader != null) {
+                Log.e(Zebra123.getTagName(context),"Setting region");
 
-            // Get and Set regulatory configuration settings
-            RegulatoryConfig regulatoryConfig = reader.Config.getRegulatoryConfig();
-            RegionInfo regionInfo = reader.ReaderCapabilities.SupportedRegions.getRegionInfo(1);
-            regulatoryConfig.setRegion(regionInfo.getRegionCode());
-            regulatoryConfig.setIsHoppingOn(regionInfo.isHoppingConfigurable());
-            regulatoryConfig.setEnabledChannels(regionInfo.getSupportedChannels());
-            reader.Config.setRegulatoryConfig(regulatoryConfig);
-        }
+                // Get and Set regulatory configuration settings
+                RegulatoryConfig regulatoryConfig = reader.Config.getRegulatoryConfig();
+                RegionInfo regionInfo = reader.ReaderCapabilities.SupportedRegions.getRegionInfo(1);
+                regulatoryConfig.setRegion(regionInfo.getRegionCode());
+                regulatoryConfig.setIsHoppingOn(regionInfo.isHoppingConfigurable());
+                regulatoryConfig.setEnabledChannels(regionInfo.getSupportedChannels());
+                reader.Config.setRegulatoryConfig(regulatoryConfig);
+            }
         }
         catch(Exception e) {
-            Log.e(TAG,"Error setting region");
+            Log.e(Zebra123.getTagName(context), "Error setting region. Error: " + e.getMessage());
         }
     }
 
@@ -151,7 +146,7 @@ public class ZebraRfid implements ZebraDevice, RfidEventsListener {
             }
         }
         catch (Exception e) {
-            Log.e(TAG,e.getMessage());
+            Log.e(Zebra123.getTagName(context), "Error setting power level. Error: " + e.getMessage());
         }
     }
 
@@ -168,19 +163,7 @@ public class ZebraRfid implements ZebraDevice, RfidEventsListener {
             }
         }
         catch (Exception e) {
-            Log.e(TAG,e.getMessage());
-        }
-    }
-
-    public void setMode(String mode) {
-        try {
-            ENUM_TRIGGER_MODE _mode = ENUM_TRIGGER_MODE.RFID_MODE;
-            if (mode.toLowerCase().trim().equals("barcode")) _mode = ENUM_TRIGGER_MODE.BARCODE_MODE;
-            if (mode.toLowerCase().trim().equals("rfid")) _mode = ENUM_TRIGGER_MODE.RFID_MODE;
-            setMode(_mode);
-        }
-        catch (Exception e) {
-            Log.e(TAG,e.getMessage());
+            Log.e(Zebra123.getTagName(context), "Error in setEvents(). Error: " + e.getMessage());
         }
     }
 
@@ -191,7 +174,7 @@ public class ZebraRfid implements ZebraDevice, RfidEventsListener {
             }
         }
         catch (Exception e) {
-            Log.e(TAG,e.getMessage());
+            Log.e(Zebra123.getTagName(context),e.getMessage());
         }
     }
 
@@ -207,7 +190,7 @@ public class ZebraRfid implements ZebraDevice, RfidEventsListener {
             }
         }
         catch (Exception e) {
-            Log.e(TAG,e.getMessage());
+            Log.e(Zebra123.getTagName(context),e.getMessage());
         }
     }
 
@@ -222,72 +205,84 @@ public class ZebraRfid implements ZebraDevice, RfidEventsListener {
             }
         }
         catch (Exception e) {
-            Log.e(TAG,e.getMessage());
+            Log.e(Zebra123.getTagName(context),e.getMessage());
         }
     }
 
     AsyncTasks connectionTask;
 
+    @Override
     public void connect() {
 
-        Log.d(TAG,">>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>> Connecting to RFID reader");
+        try
+        {
+            Log.i(Zebra123.getTagName(context),"Connecting to RFID reader");
 
-        if (connectionTask != null) {
-            connectionTask.shutdown();
-            connectionTask = null;
+            if (connectionTask != null) {
+                connectionTask.shutdown();
+                connectionTask = null;
+            }
+
+            connectionTask = new AsyncTasks() {
+
+                @Override
+                public void doInBackground() {
+                    try {
+                        if (reader == null) {
+                            Readers readers = new Readers(context,ENUM_TRANSPORT.ALL);
+                            ArrayList<ReaderDevice> rfidReaders = readers.GetAvailableRFIDReaderList();
+                            if (rfidReaders.size() > 0) {
+                                ReaderDevice device = rfidReaders.get(0);
+                                reader = device.getRFIDReader();
+
+                                //setRegulatoryConfig();
+                            }
+                            else {
+                                Log.e(Zebra123.getTagName(context),"No connectable rfid devices found");
+                            }
+                        }
+
+                        if (reader != null) {
+                            reader.connect();
+                            ConfigureReader();
+                        }
+                    }
+                    catch (Exception e)
+                    {
+                        Log.d(Zebra123.getTagName(context), e.toString());
+                    }
+                }
+
+                @Override
+                public void onPostExecute() {
+
+                    HashMap<String, Object> map = new HashMap<>();
+                    map.put("status", ZebraConnectionStatus.connected.toString());
+
+                    // notify device
+                    sendEvent(Events.connectionStatus,map);
+                }
+
+                @Override
+                public void onPreExecute() {
+                    // before execution
+                }
+            };
+
+            connectionTask.execute();
+
         }
-
-        connectionTask = new AsyncTasks() {
-
-            @Override
-            public void doInBackground() {
-                try {
-                    if (reader == null) {
-                        Readers readers = new Readers(context,ENUM_TRANSPORT.ALL);
-                        ArrayList<ReaderDevice> rfidReaders = readers.GetAvailableRFIDReaderList();
-                        if (rfidReaders.size() > 0) {
-                            ReaderDevice device = rfidReaders.get(0);
-                            reader = device.getRFIDReader();
-
-                            //setRegulatoryConfig();
-                        }
-                        else {
-                            Log.e(TAG,"No connectable rfid devices found");
-                        }
-                    }
-
-                    if (reader != null) {
-                        reader.connect();
-                        ConfigureReader();
-                    }
-                }
-                catch (Exception e)
-                {
-                    Log.d(TAG, e.toString());
-                }
-            }
-
-            @Override
-            public void onPostExecute() {
-
-                HashMap<String, Object> map = new HashMap<>();
-                map.put("status", ZebraConnectionStatus.connected.toString());
-
-                // notify device
-                sendEvent(Events.connectionStatus,map);
-            }
-
-            @Override
-            public void onPreExecute() {
-                // before execution
-            }
-        };
-
-        connectionTask.execute();
+        catch (Exception e)
+        {
+            Log.e(Zebra123.getTagName(context),"Error connecting to RFID reader. Error is " + e.toString());
+        }
     }
 
+    @Override
     public void disconnect() {
         try {
+
+            Log.i(Zebra123.getTagName(context),"Disconnecting from RFID reader");
 
             if (reader != null) reader.Events.removeEventsListener(this);
             //reader = null;
@@ -298,8 +293,9 @@ public class ZebraRfid implements ZebraDevice, RfidEventsListener {
             // notify device
             sendEvent(Events.connectionStatus,map);
 
-        } catch (Exception e) {
-            e.printStackTrace();
+        }
+        catch (Exception e) {
+            Log.e(Zebra123.getTagName(context),"Error disconnecting from RFID reader. Error is " + e.toString());
         }
     }
 
@@ -314,6 +310,7 @@ public class ZebraRfid implements ZebraDevice, RfidEventsListener {
         }
     }
 
+    @Override
     public void track(Requests request, ArrayList<String> tags) {
 
         if (request == Requests.start) {
@@ -324,6 +321,19 @@ public class ZebraRfid implements ZebraDevice, RfidEventsListener {
         }
     }
 
+    @Override
+    public void mode(Modes mode) {
+
+        if (mode == Modes.rfid) {
+            setMode(ENUM_TRIGGER_MODE.RFID_MODE);
+        }
+        else if (mode == Modes.barcode) {
+            setMode(ENUM_TRIGGER_MODE.BARCODE_MODE);
+        }
+        else {
+            setMode(ENUM_TRIGGER_MODE.RFID_MODE);
+        }
+    }
 
     @Override
     public void dispose() {
@@ -335,8 +345,8 @@ public class ZebraRfid implements ZebraDevice, RfidEventsListener {
             return true;
         else {
             if (reader == null)
-                 Log.d(TAG, "Reader is null");
-            else Log.d(TAG, "Reader is not connected");
+                 Log.d(Zebra123.getTagName(context), "Reader is null");
+            else Log.d(Zebra123.getTagName(context), "Reader is not connected");
             return false;
         }
     }
@@ -375,14 +385,14 @@ public class ZebraRfid implements ZebraDevice, RfidEventsListener {
             }
         }
         catch (Exception e) {
-            Log.e(TAG, "Error reading tag data. Error is " + e.toString());
+            Log.e(Zebra123.getTagName(context), "Error reading tag data. Error is " + e.toString());
         }
     }
 
     @Override
     public void eventStatusNotify(RfidStatusEvents event) {
 
-        Log.d(TAG, ">>>>>>>>>>>>>>>>>>> eventStatusNotify()");
+        Log.d(Zebra123.getTagName(context), "eventStatusNotify()");
 
         STATUS_EVENT_TYPE eventType = event.StatusEventData.getStatusEventType();
 
@@ -392,7 +402,7 @@ public class ZebraRfid implements ZebraDevice, RfidEventsListener {
 
             if (triggerEvent == HANDHELD_TRIGGER_EVENT_TYPE.HANDHELD_TRIGGER_PRESSED)
             {
-                Log.d(TAG, "TRIGGER DOWN");
+                Log.d(Zebra123.getTagName(context), "TRIGGER DOWN");
 
                 new AsyncTasks() {
 
@@ -416,7 +426,7 @@ public class ZebraRfid implements ZebraDevice, RfidEventsListener {
 
             else if (triggerEvent == HANDHELD_TRIGGER_EVENT_TYPE.HANDHELD_TRIGGER_RELEASED) {
 
-                Log.d(TAG, "TRIGGER UP");
+                Log.d(Zebra123.getTagName(context), "TRIGGER UP");
 
                 new AsyncTasks() {
 
@@ -458,7 +468,7 @@ public class ZebraRfid implements ZebraDevice, RfidEventsListener {
             }
         }
         catch (Exception e) {
-            Log.e(TAG, "Error in reportTags()");
+            Log.e(Zebra123.getTagName(context), "Error in reportTags()");
         }
     }
 
@@ -470,7 +480,7 @@ public class ZebraRfid implements ZebraDevice, RfidEventsListener {
             tracking.clear();
 
             if (reader != null) {
-                Log.d(TAG, "START SCANNNING");
+                Log.d(Zebra123.getTagName(context), "START SCANNNING");
 
                 // notify listener
                 sendEvent(Events.startRead,new HashMap<>());
@@ -481,7 +491,7 @@ public class ZebraRfid implements ZebraDevice, RfidEventsListener {
         }
         catch (Exception e)
         {
-            Log.e(TAG, "Error in startInventory()");
+            Log.e(Zebra123.getTagName(context), "Error in startInventory()");
             stopScanning();
         }
     }
@@ -494,7 +504,7 @@ public class ZebraRfid implements ZebraDevice, RfidEventsListener {
         try
         {
             if (reader != null) {
-                Log.d(TAG, "STOP SCANNING. Found " + tags.size() + " tags");
+                Log.d(Zebra123.getTagName(context), "STOP SCANNING. Found " + tags.size() + " tags");
 
                 // notify listener
                 sendEvent(Events.stopRead,new HashMap<>());
@@ -507,7 +517,7 @@ public class ZebraRfid implements ZebraDevice, RfidEventsListener {
             }
         }
         catch (Exception e) {
-            Log.e(TAG, "Error in stopInventory()");
+            Log.e(Zebra123.getTagName(context), "Error in stopInventory()");
         }
     }
 
@@ -519,7 +529,7 @@ public class ZebraRfid implements ZebraDevice, RfidEventsListener {
             tracking.clear();
 
             if (reader != null) {
-                Log.d(TAG, "STARTING TRACKING");
+                Log.d(Zebra123.getTagName(context), "STARTING TRACKING");
 
                 // notify listener
                 sendEvent(Events.startRead,new HashMap<>());
@@ -536,7 +546,7 @@ public class ZebraRfid implements ZebraDevice, RfidEventsListener {
         }
         catch (Exception e)
         {
-            Log.e(TAG, "Error in startTracking()");
+            Log.e(Zebra123.getTagName(context), "Error in startTracking()");
             stopTracking();
         }
     }
@@ -552,7 +562,7 @@ public class ZebraRfid implements ZebraDevice, RfidEventsListener {
         try
         {
             if (reader != null) {
-                Log.d(TAG, "STOPPING TRACKING. Found " + tags.size() + " tags");
+                Log.d(Zebra123.getTagName(context), "STOPPING TRACKING. Found " + tags.size() + " tags");
 
                 // notify listener
                 sendEvent(Events.stopRead,new HashMap<>());
@@ -562,13 +572,13 @@ public class ZebraRfid implements ZebraDevice, RfidEventsListener {
             }
         }
         catch (Exception e) {
-            Log.e(TAG, "Error in stopTracking()");
+            Log.e(Zebra123.getTagName(context), "Error in stopTracking()");
         }
     }
 
     // configuration
     private void setAntennaPower(int power) {
-        Log.d(TAG, "setAntennaPower " + power);
+        Log.d(Zebra123.getTagName(context), "setAntennaPower " + power);
         try {
             // set antenna configurations
             Antennas.AntennaRfConfig config = reader.Config.Antennas.getAntennaRfConfig(1);
@@ -584,7 +594,7 @@ public class ZebraRfid implements ZebraDevice, RfidEventsListener {
     }
 
     private void setSingulation(SESSION session, INVENTORY_STATE state) {
-        Log.d(TAG, "setSingulation " + session);
+        Log.d(Zebra123.getTagName(context), "setSingulation " + session);
         try {
             // Set the singulation control
             Antennas.SingulationControl s1_singulationControl = reader.Config.Antennas.getSingulationControl(1);
@@ -600,7 +610,7 @@ public class ZebraRfid implements ZebraDevice, RfidEventsListener {
     }
 
     private void setDPO(boolean bEnable) {
-        Log.d(TAG, "setDPO " + bEnable);
+        Log.d(Zebra123.getTagName(context), "setDPO " + bEnable);
         try {
             // control the DPO
             reader.Config.setDPOState(bEnable ? DYNAMIC_POWER_OPTIMIZATION.ENABLE : DYNAMIC_POWER_OPTIMIZATION.DISABLE);
@@ -645,7 +655,7 @@ public class ZebraRfid implements ZebraDevice, RfidEventsListener {
             Exception exception = writeTag(epc, password, MEMORY_BANK.MEMORY_BANK_EPC, newEpc, 2);
             if (exception != null) {
                 ok = false;
-                Log.e(TAG, "Error writing tag epc: " + exception.getMessage());
+                Log.e(Zebra123.getTagName(context), "Error writing tag epc: " + exception.getMessage());
                 sendEvent(Events.writeFail, ZebraDevice.toError("Error writing tag epc", exception));
             }
             else epc = newEpc;
@@ -656,7 +666,7 @@ public class ZebraRfid implements ZebraDevice, RfidEventsListener {
             Exception exception = writeTag(epc, password, MEMORY_BANK.MEMORY_BANK_USER, data, 0);
             if (exception != null) {
                 ok = false;
-                Log.e(TAG, "Error writing tag data: " + exception.getMessage());
+                Log.e(Zebra123.getTagName(context), "Error writing tag data: " + exception.getMessage());
                 sendEvent(Events.writeFail, ZebraDevice.toError("Error writing tag data", exception));
             }
             else data = "";
@@ -667,7 +677,7 @@ public class ZebraRfid implements ZebraDevice, RfidEventsListener {
             Exception exception = writeTag(epc, password, MEMORY_BANK.MEMORY_BANK_RESERVED, newPassword, 2);
             if (exception != null) {
                 ok = false;
-                Log.e(TAG, "Error writing tag password: " + exception.getMessage());
+                Log.e(Zebra123.getTagName(context), "Error writing tag password: " + exception.getMessage());
                 sendEvent(Events.writeFail, ZebraDevice.toError("Error writing tag password", exception));
             }
             else password = newPassword;
@@ -686,8 +696,10 @@ public class ZebraRfid implements ZebraDevice, RfidEventsListener {
 
 
     private Exception writeTag(String sourceEPC, String Password, MEMORY_BANK memory_bank, String targetData, int offset) {
-        Log.d(TAG, "WriteTag " + targetData);
+
         try {
+            Log.i(Zebra123.getTagName(context), "Writeing RFID tag");
+
             TagData tagData = null;
             String tagId = sourceEPC;
             TagAccess tagAccess = new TagAccess();
@@ -709,7 +721,7 @@ public class ZebraRfid implements ZebraDevice, RfidEventsListener {
             return null;
         }
         catch (Exception e) {
-            e.printStackTrace();
+            Log.e(Zebra123.getTagName(context), "Error during writeTag(). Error: " + e.getMessage());
             return e;
         }
     }
@@ -717,7 +729,7 @@ public class ZebraRfid implements ZebraDevice, RfidEventsListener {
     private void sendEvent(final ZebraDevice.Events event, final HashMap map) {
 
         if (sink == null) {
-            Log.e(TAG, "Can't send notification to flutter. Sink is null");
+            Log.e(Zebra123.getTagName(context), "Can't send notification to flutter. Sink is null");
             return;
         }
 
@@ -731,7 +743,7 @@ public class ZebraRfid implements ZebraDevice, RfidEventsListener {
             }
             catch (Exception e)
             {
-                Log.e(TAG, "Error sending notification to flutter. Error: " + e.getMessage());
+                Log.e(Zebra123.getTagName(context), "Error sending notification to flutter. Error: " + e.getMessage());
             }
         });
     }

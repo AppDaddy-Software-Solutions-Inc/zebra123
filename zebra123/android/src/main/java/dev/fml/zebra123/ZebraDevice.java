@@ -9,6 +9,7 @@ public interface ZebraDevice {
     void disconnect();
     void dispose();
     void scan(Requests request);
+    void mode(Modes mode);
     void track(Requests request, ArrayList<String> tags);
     void write(String epc, String newEpc, String password, String newPassword, String data);
 
@@ -22,12 +23,19 @@ public interface ZebraDevice {
         track,
         scan,
         write,
+        mode,
         unknown
     }
 
     enum Requests {
         start,
         stop,
+        unknown
+    }
+
+    enum Modes {
+        barcode,
+        rfid,
         unknown
     }
 
