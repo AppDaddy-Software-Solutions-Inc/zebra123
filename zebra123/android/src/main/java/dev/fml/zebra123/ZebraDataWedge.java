@@ -51,15 +51,10 @@ public class ZebraDataWedge extends BroadcastReceiver implements ZebraDevice {
         return false;
     }
 
-    // returns the intended intent action
-    private String getActionName(Context context) {
-        return Zebra123.getPackageName(context) + ".ACTION";
-    }
-
     @Override
     public void onReceive(Context context, Intent intent) {
         String actionSource = intent.getAction();
-        String actionTarget = getActionName(context);
+        String actionTarget = Zebra123.getActionName(context);
         if (actionSource.equals(actionTarget)) {
             try {
                 String barcode = intent.getStringExtra("com.symbol.datawedge.data_string");
@@ -93,30 +88,32 @@ public class ZebraDataWedge extends BroadcastReceiver implements ZebraDevice {
         }
     }
 
-    private void sendCommandString(@NotNull String command, @NotNull String parameter, boolean sendResult) {
-        try {
+
+    public static void send(Context context, String extraKey, Bundle extraValue) {
+        try
+        {
             Intent dwIntent = new Intent();
             dwIntent.setAction("com.symbol.datawedge.api.ACTION");
-            dwIntent.putExtra(command, parameter);
-            if (sendResult) {
-                dwIntent.putExtra("SEND_RESULT", "true");
-            }
+            dwIntent.putExtra(extraKey, extraValue);
             context.sendBroadcast(dwIntent);
         }
-        catch (Exception e) {
+        catch (Exception e)
+        {
             Log.e(Zebra123.getTagName(context), "Error sending command to device" + e.getMessage());
         }
     }
 
-    private void sendCommandBundle(@NotNull String command, @NotNull Bundle parameter) {
 
-        try {
+    public static void send(Context context, String extraKey, String extraValue) {
+        try
+        {
             Intent dwIntent = new Intent();
             dwIntent.setAction("com.symbol.datawedge.api.ACTION");
-            dwIntent.putExtra(command, parameter);
+            dwIntent.putExtra(extraKey, extraValue);
             context.sendBroadcast(dwIntent);
         }
-        catch (Exception e) {
+        catch (Exception e)
+        {
             Log.e(Zebra123.getTagName(context), "Error sending command to device" + e.getMessage());
         }
     }
@@ -125,14 +122,11 @@ public class ZebraDataWedge extends BroadcastReceiver implements ZebraDevice {
     public void connect() {
 
         try {
-
-            String action = getActionName(context);
-
             final IntentFilter filter = new IntentFilter();
             //filter.addAction("com.symbol.datawedge.api.RESULT_ACTION");
             //filter.addAction("com.symbol.datawedge.api.ACTION");
             //filter.addAction("com.symbol.datawedge.api.NOTIFICATION_ACTION");
-            filter.addAction(action);
+            filter.addAction(Zebra123.getActionName(context));
             filter.addCategory(Intent.CATEGORY_DEFAULT);
 
             context.registerReceiver(this, filter);
@@ -181,16 +175,13 @@ public class ZebraDataWedge extends BroadcastReceiver implements ZebraDevice {
 
     @Override
     public void scan(Requests request) {
-
         // set the scanner to start or stop scanning
-        String parameter = request == Requests.start ? "START_SCANNING" : "STOP_SCANNING";
-        String command   = "com.symbol.datawedge.api.SOFT_SCAN_TRIGGER";
-        sendCommandString(command, parameter, false);
+        send(context, "com.symbol.datawedge.api.SOFT_SCAN_TRIGGER", request == Requests.start ? "START_SCANNING" : "STOP_SCANNING");
         return;
     }
 
     @Override
-    public void mode(Modes mode) {
+    public void setMode(Modes mode) {
         Exception exception = new Exception("Not implemented");
         sendEvent(Events.error, ZebraDevice.toError("Error calling mode()", exception));
         return;
@@ -220,40 +211,37 @@ public class ZebraDataWedge extends BroadcastReceiver implements ZebraDevice {
 
         try {
 
-            // get package name
-            String pkg    = Zebra123.getPackageName(context);
-            String action = getActionName(context);
+            String packageName = Zebra123.getPackageName(context);
+            String profileName = Zebra123.getProfileName(context);
+            String actionName  = Zebra123.getActionName(context);
 
-            Log.i(Zebra123.getTagName(context), "Creating Datawedge profile for package " + pkg + " with Intent action " + action);
+            Log.i(Zebra123.getTagName(context), "Creating Datawedge profile " + profileName + " for package " + packageName + " with Intent action " + actionName);
 
             // create the profile if it doesnt exist
-            sendCommandString("com.symbol.datawedge.api.CREATE_PROFILE", pkg, false);
+            send(context, "com.symbol.datawedge.api.CREATE_PROFILE", packageName);
 
             Bundle dwProfile = new Bundle();
-            dwProfile.putString("PROFILE_NAME", pkg);
+            dwProfile.putString("PROFILE_NAME", profileName);
             dwProfile.putString("PROFILE_ENABLED", "true");
             dwProfile.putString("CONFIG_MODE", "UPDATE");
 
             Bundle appConfig = new Bundle();
-            appConfig.putString("PACKAGE_NAME", pkg);
+            appConfig.putString("PACKAGE_NAME", packageName);
 
-            String[] var4 = new String[]{"*"};
-            appConfig.putStringArray("ACTIVITY_LIST", var4);
-            Bundle[] var13 = new Bundle[]{appConfig};
-
-            dwProfile.putParcelableArray("APP_LIST", (Parcelable[])var13);
+            appConfig.putStringArray("ACTIVITY_LIST", new String[]{"*"});
+            dwProfile.putParcelableArray("APP_LIST", (Parcelable[]) new Bundle[]{appConfig});
 
             ArrayList plugins = new ArrayList();
 
-            Bundle intentPluginProperyties = new Bundle();
-            intentPluginProperyties.putString("intent_output_enabled", "true");
-            intentPluginProperyties.putString("intent_action", action);
-            intentPluginProperyties.putString("intent_delivery", "2");
+            Bundle intentPluginProperties = new Bundle();
+            intentPluginProperties.putString("intent_output_enabled", "true");
+            intentPluginProperties.putString("intent_action", actionName);
+            intentPluginProperties.putString("intent_delivery", "2");
 
             Bundle intentPlugin = new Bundle();
             intentPlugin.putString("PLUGIN_NAME", "INTENT");
             intentPlugin.putString("RESET_CONFIG", "true");
-            intentPlugin.putBundle("PARAM_LIST", intentPluginProperyties);
+            intentPlugin.putBundle("PARAM_LIST", intentPluginProperties);
             plugins.add(intentPlugin);
 
             Bundle barcodePluginProperties = new Bundle();
@@ -295,9 +283,9 @@ public class ZebraDataWedge extends BroadcastReceiver implements ZebraDevice {
             keystrokePlugin.putBundle("PARAM_LIST", keystrokePluginProperties);
             plugins.add(keystrokePlugin);
             dwProfile.putParcelableArrayList("PLUGIN_CONFIG", plugins);
-            this.sendCommandBundle("com.symbol.datawedge.api.SET_CONFIG", dwProfile);
+            this.send(context, "com.symbol.datawedge.api.SET_CONFIG", dwProfile);
 
-            sendCommandString("com.symbol.datawedge.api.SCANNER_INPUT_PLUGIN", "ENABLE_PLUGIN", false);
+            //sendCommandString("com.symbol.datawedge.api.SCANNER_INPUT_PLUGIN", "ENABLE_PLUGIN", false);
         }
         catch (Exception e) {
             Log.e(Zebra123.getTagName(context), "Error creating profile" + e.getMessage());

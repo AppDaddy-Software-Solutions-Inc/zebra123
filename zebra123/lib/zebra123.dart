@@ -55,6 +55,14 @@ class Zebra123 {
   bool get isListening => _bridge.contains(this);
 
   // start scanning for rfid tags
+  Future startReading() async {
+    if (_bridge.contains(this)) {
+      _bridge.scan(Requests.start);
+    }
+  }
+
+
+  // start scanning for rfid tags
   Future startScanning() async {
     if (_bridge.contains(this)) {
       _bridge.scan(Requests.start);
@@ -82,10 +90,10 @@ class Zebra123 {
     }
   }
 
-  // stop rfid tag tracking
+  // set device mode
   Future setMode(Modes mode) async {
     if (_bridge.contains(this)) {
-      _bridge.mode(mode);
+      _bridge.setMode(mode);
     }
   }
 

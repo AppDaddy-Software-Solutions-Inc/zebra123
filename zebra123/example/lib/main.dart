@@ -35,9 +35,22 @@ class _MyAppState extends State<MyApp> {
     super.initState();
   }
 
+  void startReading() {
+    zebra123?.setMode(Modes.barcode);
+    zebra123?.startReading();
+    tags.clear();
+    barcodes.clear();
+    setState(() {
+      scanning = true;
+      tracking = false;
+    });
+  }
+
   void startScanning() {
+    zebra123?.setMode(Modes.rfid);
     zebra123?.startScanning();
     tags.clear();
+    barcodes.clear();
     setState(() {
       scanning = true;
       tracking = false;
@@ -53,6 +66,7 @@ class _MyAppState extends State<MyApp> {
   }
 
   void startTracking(List<String> tags) {
+    zebra123?.setMode(Modes.rfid);
     zebra123?.startTracking(tags);
     setState(() {
       scanning = false;
@@ -110,6 +124,20 @@ class _MyAppState extends State<MyApp> {
           child: SizedBox(width: 75, height: 50, child: scanBtn));
     }
 
+    Widget readBtn = const Offstage();
+    if (zebra123?.connectionStatus == Status.connected &&
+        !scanning &&
+        !tracking) {
+      readBtn = FloatingActionButton(
+          backgroundColor: Colors.lightGreenAccent,
+          onPressed: () => startReading(),
+          child: const Text("Read",
+              style: TextStyle(color: Colors.black, fontSize: 16)));
+      readBtn = Padding(
+          padding: const EdgeInsets.only(left: 5, right: 5),
+          child: SizedBox(width: 75, height: 50, child: readBtn));
+    }
+
     Widget stopBtn = const Offstage();
     if (scanning || tracking) {
       stopBtn = FloatingActionButton(
@@ -124,7 +152,7 @@ class _MyAppState extends State<MyApp> {
 
     var buttons = Row(
         mainAxisAlignment: MainAxisAlignment.center,
-        children: [connectBtn, scanBtn, stopBtn]);
+        children: [connectBtn, scanBtn, readBtn, stopBtn]);
     children.add(buttons);
 
     List<Widget> results = [];

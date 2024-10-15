@@ -37,15 +37,27 @@ public class Zebra123 implements FlutterPlugin, MethodCallHandler, StreamHandler
   boolean supportsRfid = false;
   boolean supportsDatawedge = false;
 
-  // returns the intended intent action
+  // returns the package name
   public static String getPackageName(Context context) {
     if (context == null) return "unknown";
     return context.getPackageName();
   }
 
-  // returns the intended intent action
+  // returns the datawedge profile name
+  public static String getProfileName(Context context) {
+    if (context == null) return "unknown";
+    return context.getPackageName() + "." + "profile";
+  }
+
+  // returns the datawedge intent action
+  public static String getActionName(Context context) {
+    if (context == null) return "unknown";
+    return context.getPackageName() + "." + "ACTION";
+  }
+
+  // returns the log tag name
   public static String getTagName(Context context) {
-    return getPackageName(context) + ".ZEBRA";
+    return getPackageName(context) + "." + "ZEBRA";
   }
 
   @Override
@@ -107,12 +119,12 @@ public class Zebra123 implements FlutterPlugin, MethodCallHandler, StreamHandler
 
       case mode:
         if (device != null) {
-          ZebraDevice.Modes mode = ZebraDevice.Modes.unknown;
+          ZebraDevice.Modes mode = ZebraDevice.Modes.mixed;
           try {
             mode = ZebraDevice.Modes.valueOf(argument(call,"mode"));
           }
           catch(Exception e) {}
-          device.mode(mode);
+          device.setMode(mode);
         }
         break;
 

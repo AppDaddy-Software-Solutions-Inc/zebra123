@@ -65,7 +65,7 @@ class Bridge {
   }
 
   // set device mode
-  void mode(Modes mode) {
+  void setMode(Modes mode) {
     _methodChannel.invokeMethod("mode", {"mode": fromEnum(mode)});
   }
 

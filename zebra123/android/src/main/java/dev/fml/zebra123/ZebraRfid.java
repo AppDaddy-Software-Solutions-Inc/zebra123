@@ -1,9 +1,13 @@
 package dev.fml.zebra123;
 
+import android.content.BroadcastReceiver;
 import android.content.Context;
+import android.content.IntentFilter;
 import android.os.Handler;
 import android.os.Looper;
 import android.util.Log;
+import android.content.Intent;
+import android.os.Bundle;
 
 import com.zebra.rfid.api3.ACCESS_OPERATION_CODE;
 import com.zebra.rfid.api3.ACCESS_OPERATION_STATUS;
@@ -47,7 +51,7 @@ import java.util.concurrent.Executors;
 import io.flutter.plugin.common.EventChannel.StreamHandler;
 import io.flutter.plugin.common.EventChannel.EventSink;
 
-public class ZebraRfid implements ZebraDevice, RfidEventsListener {
+public class ZebraRfid extends BroadcastReceiver implements ZebraDevice, RfidEventsListener {
 
     private static final Interfaces INTERFACE = Interfaces.rfidapi3;
 
@@ -55,6 +59,8 @@ public class ZebraRfid implements ZebraDevice, RfidEventsListener {
     private Context context;
     private EventSink sink = null;
     private RFIDReader reader;
+    private boolean isDWRegistered = false;
+    private Modes mode = Modes.mixed;
 
     // holds a list of tags read
     private HashMap<String, TagInfo> tags = new HashMap<>();
@@ -63,9 +69,14 @@ public class ZebraRfid implements ZebraDevice, RfidEventsListener {
     private ArrayList<String> tracking = new ArrayList<>();
 
     ZebraRfid(Context context, EventSink sink) {
+
         this.context = context;
         this.sink = sink;
         handler = new Handler(Looper.getMainLooper());
+
+        // datawedge is required to read barcodes
+        createProfile();
+        connectDatawedge();
     }
 
     public static boolean isSupported(Context context) {
@@ -90,8 +101,8 @@ public class ZebraRfid implements ZebraDevice, RfidEventsListener {
                 // receive events from reader
                 setEvents();
 
-                // set read mode
-                setMode(ENUM_TRIGGER_MODE.RFID_MODE);
+                // set mixed mode as default
+                setMode(mode);
 
                 // set start and stop triggers
                 setTriggers(START_TRIGGER_TYPE.START_TRIGGER_TYPE_IMMEDIATE, STOP_TRIGGER_TYPE.STOP_TRIGGER_TYPE_IMMEDIATE);
@@ -112,6 +123,72 @@ public class ZebraRfid implements ZebraDevice, RfidEventsListener {
                 Log.e(Zebra123.getTagName(context), "Error configuring reader. Error: " + e.getMessage());
             }
         }
+    }
+
+    public void createProfile(){
+
+        String packageName = Zebra123.getPackageName(context);
+        String profileName = Zebra123.getProfileName(context);
+        String actionName  = Zebra123.getActionName(context);
+        Log.i(Zebra123.getTagName(context), "Creating Datawedge profile " + profileName + " for package " + packageName + " with Intent action " + getActionName(context));
+
+
+        // Send DataWedge intent with extra to create profile
+        // Use CREATE_PROFILE: http://techdocs.zebra.com/datawedge/latest/guide/api/createprofile/
+        ZebraDataWedge.send(context, "com.symbol.datawedge.api.CREATE_PROFILE", profileName);
+
+        // Configure created profile to apply to this app
+        Bundle profileConfig = new Bundle();
+
+        // Configure barcode input plugin
+        profileConfig.putString("PROFILE_NAME", profileName);
+        profileConfig.putString("PROFILE_ENABLED", "true");
+        profileConfig.putString("CONFIG_MODE", "UPDATE"); // Update specified settings in profile
+
+        // PLUGIN_CONFIG bundle properties
+        Bundle rfidConfig = new Bundle();
+        rfidConfig.putString("PLUGIN_NAME", "RFID");
+        rfidConfig.putString("RESET_CONFIG", "true");
+
+        // PARAM_LIST bundle properties
+        Bundle rfidProps = new Bundle();
+        rfidProps.putString("rfid_input_enabled", "false");
+        rfidConfig.putBundle("PARAM_LIST", rfidProps);
+        profileConfig.putBundle("PLUGIN_CONFIG", rfidConfig);
+
+        // Apply configs
+        // Use SET_CONFIG: http://techdocs.zebra.com/datawedge/latest/guide/api/setconfig/
+        ZebraDataWedge.send(context, "com.symbol.datawedge.api.SET_CONFIG", profileConfig);
+
+        // Configure intent output for captured data to be sent to this app
+        Bundle intentConfig = new Bundle();
+        intentConfig.putString("PLUGIN_NAME", "INTENT");
+        intentConfig.putString("RESET_CONFIG", "true");
+
+        Bundle intentProps = new Bundle();
+        intentProps.putString("intent_output_enabled", "true");
+        intentProps.putString("intent_action", getActionName(context));
+        intentProps.putString("intent_delivery", "2");
+
+        intentConfig.putBundle("PARAM_LIST", intentProps);
+        profileConfig.putBundle("PLUGIN_CONFIG", intentConfig);
+        ZebraDataWedge.send(context, "com.symbol.datawedge.api.SET_CONFIG", profileConfig);
+
+        Bundle appConfig = new Bundle();
+        appConfig.putString("PACKAGE_NAME", packageName); //  Associate the profile with this app
+        appConfig.putStringArray("ACTIVITY_LIST", new String[]{"*"});
+        profileConfig.putParcelableArray("APP_LIST", new Bundle[]{appConfig});
+
+        ZebraDataWedge.send(context, "com.symbol.datawedge.api.SET_CONFIG", profileConfig);
+    }
+
+    // returns the intended intent action
+    private String getActionName(Context context) {
+        return Zebra123.getPackageName(context) + ".ACTION";
+    }
+
+    private String getServiceActionName(Context context) {
+        return Zebra123.getPackageName(context) + "service.ACTION";
     }
 
     private void setRegulatoryConfig() {
@@ -175,6 +252,22 @@ public class ZebraRfid implements ZebraDevice, RfidEventsListener {
         }
         catch (Exception e) {
             Log.e(Zebra123.getTagName(context),e.getMessage());
+        }
+    }
+
+    @Override
+    public void setMode(Modes mode) {
+        this.mode = mode;
+        switch (mode) {
+            case barcode:
+                setMode(ENUM_TRIGGER_MODE.BARCODE_MODE);
+                break;
+            case rfid:
+                setMode(ENUM_TRIGGER_MODE.RFID_MODE);
+                break;
+            case mixed:
+                setMode(ENUM_TRIGGER_MODE.BARCODE_MODE);
+                break;
         }
     }
 
@@ -278,10 +371,46 @@ public class ZebraRfid implements ZebraDevice, RfidEventsListener {
         }
     }
 
+    private void connectDatawedge() {
+
+        try
+        {
+            // disconnect
+            if (isDWRegistered) disconnectDatawedge();
+
+            IntentFilter filter = new IntentFilter();
+            //filter.addAction("com.symbol.datawedge.api.RESULT_ACTION");
+            //filter.addAction("com.symbol.datawedge.api.ACTION");
+            //filter.addAction("com.symbol.datawedge.api.NOTIFICATION_ACTION");
+            filter.addAction(Zebra123.getActionName(context));
+            filter.addCategory(Intent.CATEGORY_DEFAULT);
+
+            context.registerReceiver(this, filter);
+            isDWRegistered = true;
+        }
+        catch(Exception e) {
+            isDWRegistered = false;
+            Log.e(Zebra123.getTagName(context),"Error connecting to datawedge. Error is " + e.toString());
+        }
+    }
+
+    private void disconnectDatawedge() {
+
+        try
+        {
+            if (!isDWRegistered) return;
+            context.unregisterReceiver(this);
+            isDWRegistered = false;
+        }
+        catch(Exception e) {
+            isDWRegistered = false;
+            Log.e(Zebra123.getTagName(context),"Error disconnecting datawedge. Error is " + e.toString());
+        }
+    }
+
     @Override
     public void disconnect() {
         try {
-
             Log.i(Zebra123.getTagName(context),"Disconnecting from RFID reader");
 
             if (reader != null) reader.Events.removeEventsListener(this);
@@ -292,7 +421,6 @@ public class ZebraRfid implements ZebraDevice, RfidEventsListener {
 
             // notify device
             sendEvent(Events.connectionStatus,map);
-
         }
         catch (Exception e) {
             Log.e(Zebra123.getTagName(context),"Error disconnecting from RFID reader. Error is " + e.toString());
@@ -322,22 +450,8 @@ public class ZebraRfid implements ZebraDevice, RfidEventsListener {
     }
 
     @Override
-    public void mode(Modes mode) {
-
-        if (mode == Modes.rfid) {
-            setMode(ENUM_TRIGGER_MODE.RFID_MODE);
-        }
-        else if (mode == Modes.barcode) {
-            setMode(ENUM_TRIGGER_MODE.BARCODE_MODE);
-        }
-        else {
-            setMode(ENUM_TRIGGER_MODE.RFID_MODE);
-        }
-    }
-
-    @Override
     public void dispose() {
-        //listener = null;
+        context.unregisterReceiver(this);
     }
 
     private boolean isReaderConnected() {
@@ -390,6 +504,36 @@ public class ZebraRfid implements ZebraDevice, RfidEventsListener {
     }
 
     @Override
+    public void onReceive(Context context, Intent intent) {
+        String actionSource = intent.getAction();
+        String actionTarget = getActionName(context);
+        if (actionSource.equals(actionTarget)) {
+            try {
+                String barcode = intent.getStringExtra("com.symbol.datawedge.data_string");
+                String format  = intent.getStringExtra("com.symbol.datawedge.label_type");
+                long   seen    = System.currentTimeMillis();
+                String date    = new SimpleDateFormat("dd/MM/yyyy HH:mm:ss.SSS").format(new Date(seen)).toString();
+
+                // create a map of simple objects
+                HashMap<String, Object> tag = new HashMap<>();
+                tag.put("barcode", barcode);
+                tag.put("format", format);
+                tag.put("seen", date);
+
+                // notify listener
+                Log.d(Zebra123.getTagName(context), Events.readBarcode + ": " + tag);
+
+                // only send if mixed or barcode mode
+                if (mode == Modes.mixed || mode == Modes.barcode) sendEvent(Events.readBarcode, tag);
+            }
+            catch(Exception e) {
+                Log.e(Zebra123.getTagName(context), "Error deserializing json object" + e.getMessage());
+                sendEvent(Events.error, ZebraDevice.toError("onReceive()", e));
+            }
+        }
+    }
+
+    @Override
     public void eventStatusNotify(RfidStatusEvents event) {
 
         Log.d(Zebra123.getTagName(context), "eventStatusNotify()");
@@ -398,8 +542,10 @@ public class ZebraRfid implements ZebraDevice, RfidEventsListener {
 
         if (eventType == STATUS_EVENT_TYPE.HANDHELD_TRIGGER_EVENT) {
 
+            // get the trigger event
             HANDHELD_TRIGGER_EVENT_TYPE triggerEvent = event.StatusEventData.HandheldTriggerEventData.getHandheldEvent();
 
+            // trigger down?
             if (triggerEvent == HANDHELD_TRIGGER_EVENT_TYPE.HANDHELD_TRIGGER_PRESSED)
             {
                 Log.d(Zebra123.getTagName(context), "TRIGGER DOWN");
@@ -424,6 +570,7 @@ public class ZebraRfid implements ZebraDevice, RfidEventsListener {
                 }.execute();
             }
 
+            // trigger up?
             else if (triggerEvent == HANDHELD_TRIGGER_EVENT_TYPE.HANDHELD_TRIGGER_RELEASED) {
 
                 Log.d(Zebra123.getTagName(context), "TRIGGER UP");
@@ -464,7 +611,7 @@ public class ZebraRfid implements ZebraDevice, RfidEventsListener {
                 hashMap.put("tags",data);
 
                 // notify listener
-                sendEvent(Events.readRfid,hashMap);
+                if (mode == Modes.rfid || mode == Modes.mixed) sendEvent(Events.readRfid,hashMap);
             }
         }
         catch (Exception e) {
@@ -479,15 +626,30 @@ public class ZebraRfid implements ZebraDevice, RfidEventsListener {
             // clear tracking filter
             tracking.clear();
 
-            if (reader != null) {
-                Log.d(Zebra123.getTagName(context), "START SCANNNING");
+            if (reader != null)
+            {
+                if (mode == Modes.mixed || mode == Modes.rfid)
+                {
+                    Log.d(Zebra123.getTagName(context), "START SCANNNING");
+
+                    reader.Actions.Inventory.stop();
+                    reader.Actions.Inventory.perform();
+                }
+
+                if (mode == Modes.mixed || mode == Modes.barcode)
+                {
+                    Log.d(Zebra123.getTagName(context), "START READING");
+
+                    // set the scanner to start scanning
+                    String parameter = "START_SCANNING";
+                    String command   = "com.symbol.datawedge.api.SOFT_SCAN_TRIGGER";
+                    ZebraDataWedge.send(context, command, parameter);
+                }
 
                 // notify listener
                 sendEvent(Events.startRead,new HashMap<>());
-
-                reader.Actions.Inventory.stop();
-                reader.Actions.Inventory.perform();
             }
+
         }
         catch (Exception e)
         {
@@ -503,14 +665,28 @@ public class ZebraRfid implements ZebraDevice, RfidEventsListener {
 
         try
         {
-            if (reader != null) {
-                Log.d(Zebra123.getTagName(context), "STOP SCANNING. Found " + tags.size() + " tags");
+            if (reader != null)
+            {
+                if (mode == Modes.mixed || mode == Modes.rfid)
+                {
+                    Log.d(Zebra123.getTagName(context), "STOP SCANNING. Found " + tags.size() + " tags");
 
-                // notify listener
-                sendEvent(Events.stopRead,new HashMap<>());
+                    // notify listener
+                    sendEvent(Events.stopRead,new HashMap<>());
 
-                // stop the reader
-                reader.Actions.Inventory.stop();
+                    // stop the reader
+                    reader.Actions.Inventory.stop();
+                }
+
+                if (mode == Modes.mixed || mode == Modes.barcode)
+                {
+                    Log.d(Zebra123.getTagName(context), "STOP READING");
+
+                    // set the scanner to start scanning
+                    String parameter = "STOP_SCANNING";
+                    String command   = "com.symbol.datawedge.api.SOFT_SCAN_TRIGGER";
+                    ZebraDataWedge.send(context, command, parameter);
+                }
 
                 // report tags
                 reportTags();
@@ -527,6 +703,9 @@ public class ZebraRfid implements ZebraDevice, RfidEventsListener {
         {
             // clear tracking
             tracking.clear();
+
+            // barcode only mode enabled?
+            if (mode == Modes.barcode) return;
 
             if (reader != null) {
                 Log.d(Zebra123.getTagName(context), "STARTING TRACKING");
